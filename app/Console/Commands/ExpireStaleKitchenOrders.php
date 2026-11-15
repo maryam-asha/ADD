@@ -16,9 +16,10 @@ use Throwable;
  * what they took (2026-11-14 spec, decisions 3, 5 and 7), in three sweeps:
  * held for a card past `payment_due_at` — after one last word from the
  * gateway, so a card the bank accepted meanwhile moves the order on instead
- * — awaiting reception past kitchen.reception_window_minutes, and pending
- * past kitchen.accept_window_minutes, an order on a bill included. Each
- * order is locked and re-read where it is let go (KitchenOrderService::expire),
+ * — awaiting reception past kitchen.reception_window_minutes from reaching
+ * reception's queue (`reached_reception_at`), and pending past
+ * kitchen.accept_window_minutes, an order on a bill included. Each order
+ * is locked and re-read where it is let go (KitchenOrderService::expire),
  * so a decision landing in the same instant wins.
  */
 class ExpireStaleKitchenOrders extends Command
@@ -42,9 +43,7 @@ class ExpireStaleKitchenOrders extends Command
             'reception' => $this->sweep(
                 KitchenOrder::query()
                     ->where('status', KitchenOrderStatus::AwaitingReception)
-                    ->where(fn (Builder $q) => $q
-                        ->where('paid_at', '<=', now()->subMinutes($reception))
-                        ->orWhere(fn (Builder $q) => $q->whereNull('paid_at')->where('created_at', '<=', now()->subMinutes($reception)))),
+                    ->where('reached_reception_at', '<=', now()->subMinutes($reception)),
                 'reception', $orders, null,
             ),
             'kitchen' => $this->sweep(

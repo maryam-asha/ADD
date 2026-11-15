@@ -142,7 +142,7 @@ class KitchenOrderService
             $order->forceFill([
                 'status' => $status,
                 'payment_due_at' => $held ? now()->addMinutes((int) config('payments.prepayment_window_minutes', 15)) : null,
-                'reached_kitchen_at' => $status === KitchenOrderStatus::Pending ? now() : null,
+                ...KitchenOrder::arrivedAt($status),
             ])->save();
 
             $order->lines()->createMany($priced);
@@ -305,9 +305,11 @@ class KitchenOrderService
      * Cancel an order nobody acted on in time (decisions 3, 5 and 7), and
      * give back what it took. `$why` names the wait it was stuck in:
      * `payment` (held for its card, past `payment_due_at`), `reception`
-     * (past kitchen.reception_window_minutes, measured from when it was paid
-     * or else sent) or `kitchen` (pending past kitchen.accept_window_minutes
-     * from reaching the kitchen - an order on a bill too).
+     * (past kitchen.reception_window_minutes from reaching reception's queue,
+     * `reached_reception_at` - after a card hold too, so a switch to cash near
+     * its deadline still gets the whole window) or `kitchen` (pending past
+     * kitchen.accept_window_minutes from reaching the kitchen - an order on a
+     * bill too).
      *
      * Lock order as everywhere here: the bill, then the order, then its
      * payment. The order is re-read under the lock: one a decision reached
@@ -362,7 +364,8 @@ class KitchenOrderService
                 && $order->payment_due_at !== null
                 && $order->payment_due_at->lte(now()),
             'reception' => $order->status === KitchenOrderStatus::AwaitingReception
-                && ($order->paid_at ?? $order->created_at)->lte(now()->subMinutes((int) config('kitchen.reception_window_minutes'))),
+                && $order->reached_reception_at !== null
+                && $order->reached_reception_at->lte(now()->subMinutes((int) config('kitchen.reception_window_minutes'))),
             'kitchen' => $order->status === KitchenOrderStatus::Pending
                 && $order->reached_kitchen_at !== null
                 && $order->reached_kitchen_at->lte(now()->subMinutes((int) config('kitchen.accept_window_minutes'))),

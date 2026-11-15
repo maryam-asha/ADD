@@ -162,6 +162,14 @@ automatically.
      cancels it after `KITCHEN_RECEPTION_WINDOW_MINUTES`, 15 by default, refunds
      it, and tells the member. Reception might otherwise never see an order
      arrive, and the member would wait with no answer.
+     - *Correction 2026-11-15 (final review):* the window was first measured
+       from when the order was paid, or else sent. A card hold switched to
+       cash has no `paid_at`, so it counted from sending: switched at minute
+       12, it reached the desk with 3 of its 15 minutes left. The order now
+       records `reached_reception_at` wherever it enters
+       `awaiting_reception` (sending, leaving a card hold), and the window
+       counts from that. A card landing later on a cash order already at the
+       desk no longer restarts it either. *Given up:* nothing beyond a column.
    - Reception decides on its own judgment (it knows who is at the desk). No
      automatic presence signal is consulted (see Non-goals).
 

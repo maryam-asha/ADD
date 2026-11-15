@@ -196,7 +196,7 @@ class ExpireStaleOrdersTest extends TestCase
     public function test_unanswered_reception_order_is_cancelled_and_refunded_after_15_minutes(): void
     {
         $order = $this->sendPaid();
-        $order->forceFill(['status' => KitchenOrderStatus::AwaitingReception, 'route' => OrderRoute::Reception, 'reached_kitchen_at' => null])->save();
+        $order->forceFill(['status' => KitchenOrderStatus::AwaitingReception, 'route' => OrderRoute::Reception, 'reached_kitchen_at' => null, 'reached_reception_at' => now()])->save();
         $this->assertSame(60, $this->balance());
 
         $this->travel(14)->minutes();
@@ -213,7 +213,7 @@ class ExpireStaleOrdersTest extends TestCase
         $this->assertSame(1, $this->notices($this->member, 'kitchen_order.expired_reception')->count());
     }
 
-    public function test_a_card_order_is_measured_from_when_it_was_paid(): void
+    public function test_a_card_order_is_measured_from_when_it_reached_reception(): void
     {
         $order = $this->sendPaid();
         $order->forceFill([
@@ -223,11 +223,44 @@ class ExpireStaleOrdersTest extends TestCase
             'payment_choice' => OrderPaymentChoice::Card,
             'created_at' => now()->subMinutes(30),
             'paid_at' => now()->subMinutes(5),
+            'reached_reception_at' => now()->subMinutes(5),
         ])->save();
 
         $this->sweep();
 
         $this->assertSame(KitchenOrderStatus::AwaitingReception, $order->refresh()->status);
+    }
+
+    public function test_a_card_hold_switched_to_cash_gets_the_whole_reception_window(): void
+    {
+        $this->wallet();
+        $this->fakeCard('P');
+        $this->postJson('/api/v1/member/kitchen-orders', [
+            'lines' => [['sale_item_id' => $this->cola->id, 'quantity' => 2]],
+            'payment' => ['method' => 'card'],
+            'delivery' => ['type' => 'pickup'],
+        ])->assertCreated()->assertJsonPath('data.status', 'awaiting_payment');
+        $order = KitchenOrder::query()->sole();
+
+        // The member gives up on the card at minute 12 and pays cash at the desk instead.
+        $this->travel(12)->minutes();
+        $this->postJson('/api/v1/member/kitchen-orders', [
+            'order_id' => $order->id,
+            'lines' => [['sale_item_id' => $this->cola->id, 'quantity' => 2]],
+            'payment' => ['method' => 'cash'],
+            'delivery' => ['type' => 'pickup'],
+        ])->assertOk()->assertJsonPath('data.status', 'awaiting_reception');
+        $this->assertSame(now()->toDateTimeString(), $order->refresh()->reached_reception_at?->toDateTimeString());
+
+        $this->travel(14)->minutes();
+        $this->sweep();
+        $this->assertSame(KitchenOrderStatus::AwaitingReception, $order->refresh()->status);
+
+        $this->travel(2)->minutes();
+        $this->sweep();
+
+        $this->assertSame(KitchenOrderStatus::Cancelled, $order->refresh()->status);
+        $this->assertSame(1, $this->notices($this->member, 'kitchen_order.expired_reception')->count());
     }
 
     public function test_kitchen_unaccepted_order_is_cancelled_after_15_minutes(): void
@@ -254,7 +287,7 @@ class ExpireStaleOrdersTest extends TestCase
     public function test_reception_accept_and_expiry_race_one_wins(): void
     {
         $order = $this->sendPaid();
-        $order->forceFill(['status' => KitchenOrderStatus::AwaitingReception, 'route' => OrderRoute::Reception, 'reached_kitchen_at' => null])->save();
+        $order->forceFill(['status' => KitchenOrderStatus::AwaitingReception, 'route' => OrderRoute::Reception, 'reached_kitchen_at' => null, 'reached_reception_at' => now()])->save();
         $stale = KitchenOrder::query()->findOrFail($order->id);
         $this->travel(16)->minutes();
 
@@ -273,7 +306,7 @@ class ExpireStaleOrdersTest extends TestCase
     {
         config(['kitchen.reception_window_minutes' => 5, 'kitchen.accept_window_minutes' => 30]);
         $waiting = $this->sendPaid();
-        $waiting->forceFill(['status' => KitchenOrderStatus::AwaitingReception, 'route' => OrderRoute::Reception, 'reached_kitchen_at' => null])->save();
+        $waiting->forceFill(['status' => KitchenOrderStatus::AwaitingReception, 'route' => OrderRoute::Reception, 'reached_kitchen_at' => null, 'reached_reception_at' => now()])->save();
         $pending = $this->sendPaid();
         $pending->forceFill(['status' => KitchenOrderStatus::Pending, 'route' => OrderRoute::Kitchen, 'reached_kitchen_at' => now()])->save();
 

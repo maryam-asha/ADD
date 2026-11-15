@@ -254,6 +254,7 @@ class PayingWhenSendingTest extends TestCase
         $this->assertSame(OrderPaymentChoice::Card, $order->payment_choice);
         $this->assertSame(now()->addMinutes(15)->toDateTimeString(), $order->payment_due_at?->toDateTimeString());
         $this->assertNull($order->reached_kitchen_at);
+        $this->assertNull($order->reached_reception_at);
         $this->assertNull($order->paid_at);
 
         // Neither the kitchen board nor reception hears of it.
@@ -497,6 +498,7 @@ class PayingWhenSendingTest extends TestCase
         $this->assertSame(OrderPaymentChoice::Cash, $order->payment_choice);
         $this->assertNull($order->billable_type);
         $this->assertNull($order->reached_kitchen_at);
+        $this->assertNotNull($order->reached_reception_at);
         $this->assertSame(0, Payment::query()->count());
 
         Event::assertNotDispatched(KitchenOrderChanged::class);

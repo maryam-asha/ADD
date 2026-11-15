@@ -6,7 +6,7 @@
  */
 return [
 
-    // An order awaiting reception's decision, from when it was sent.
+    // An order awaiting reception's decision, from when it reached reception's queue.
     'reception_window_minutes' => (int) env('KITCHEN_RECEPTION_WINDOW_MINUTES', 15),
 
     // A pending order the kitchen has not accepted, from when it reached the kitchen.

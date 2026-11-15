@@ -67,6 +67,21 @@ class KitchenOrderSchemaTest extends TestCase
         $this->assertEquals($sent, $order->fresh()->reached_kitchen_at);
     }
 
+    public function test_orders_already_waiting_at_reception_reached_it_when_sent(): void
+    {
+        $sent = now()->subMinutes(20)->startOfSecond();
+        $waiting = KitchenOrder::factory()->withoutBill()->create(['status' => KitchenOrderStatus::AwaitingReception, 'reached_kitchen_at' => null]);
+        $pending = KitchenOrder::factory()->create();
+        KitchenOrder::query()->update(['created_at' => $sent]);
+
+        $migration = require database_path('migrations/2026_11_15_110000_kitchen_orders_reached_reception_at.php');
+        $migration->down();
+        $migration->up();
+
+        $this->assertEquals($sent, $waiting->fresh()->reached_reception_at);
+        $this->assertNull($pending->fresh()->reached_reception_at);
+    }
+
     public function test_admin_queue_default_excludes_the_new_statuses(): void
     {
         $this->seed(RoleSeeder::class);

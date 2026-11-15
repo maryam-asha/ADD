@@ -66,6 +66,7 @@ class KitchenOrder extends Model
         'payment_choice',
         'payment_due_at',
         'reached_kitchen_at',
+        'reached_reception_at',
         'reception_decided_by',
         'reception_decided_at',
         'cash_return',
@@ -97,6 +98,7 @@ class KitchenOrder extends Model
             'payment_choice' => OrderPaymentChoice::class,
             'payment_due_at' => 'datetime',
             'reached_kitchen_at' => 'datetime',
+            'reached_reception_at' => 'datetime',
             'reception_decided_by' => 'integer',
             'reception_decided_at' => 'datetime',
             'cash_return' => CashReturn::class,
@@ -183,10 +185,28 @@ class KitchenOrder extends Model
     }
 
     /**
+     * The clock each first stage counts from, for a row entering `$status`
+     * now: `reached_kitchen_at` for the kitchen's accept window,
+     * `reached_reception_at` for reception's window. Every path that puts an
+     * order on its route's first stage writes both (sending, and leaving a
+     * card hold), so neither window ever counts time spent waiting for a card.
+     *
+     * @return array{reached_kitchen_at: \Illuminate\Support\Carbon|null, reached_reception_at: \Illuminate\Support\Carbon|null}
+     */
+    public static function arrivedAt(KitchenOrderStatus $status): array
+    {
+        return [
+            'reached_kitchen_at' => $status === KitchenOrderStatus::Pending ? now() : null,
+            'reached_reception_at' => $status === KitchenOrderStatus::AwaitingReception ? now() : null,
+        ];
+    }
+
+    /**
      * Out of its card hold (2026-11-14 spec, decision 3) — paid, or another
-     * method chosen: on to its route's first stage, the deadline gone. On a
-     * row the caller has locked and found still `awaiting_payment`; the
-     * caller tells whoever now sees it (KitchenOrderNotifier::arrived()).
+     * method chosen: on to its route's first stage, the deadline gone, and
+     * that stage's window starting now (arrivedAt()). On a row the caller
+     * has locked and found still `awaiting_payment`; the caller tells
+     * whoever now sees it (KitchenOrderNotifier::arrived()).
      */
     public function releaseFromHold(): void
     {
@@ -195,7 +215,7 @@ class KitchenOrder extends Model
         $this->forceFill([
             'status' => $status,
             'payment_due_at' => null,
-            'reached_kitchen_at' => $status === KitchenOrderStatus::Pending ? now() : null,
+            ...self::arrivedAt($status),
         ])->save();
     }
 
