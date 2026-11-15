@@ -102,7 +102,7 @@ class KitchenOrderNotifier
 
     /**
      * An order that was not made gave its points back: the member is told how
-     * many, and to which wallet: their own, or the company's that paid.
+     * many, and whether to their own wallet or to the company's that paid.
      */
     public function refunded(KitchenOrder $order, Payment $payment): void
     {
@@ -113,18 +113,19 @@ class KitchenOrderNotifier
         }
 
         $wallet = $payment->wallet;
-        $name = $wallet?->owner_type === OwnerType::Company
-            ? (string) Company::query()->whereKey($wallet->owner_id)->value('legal_name')
-            : $member->name;
+        $company = $wallet?->owner_type === OwnerType::Company
+            ? (Company::query()->whereKey($wallet->owner_id)->value('legal_name') ?: '#'.$wallet->owner_id)
+            : null;
 
-        $this->notifications->sendToUser($member, 'kitchen_order.refunded', [
-            'order' => '#'.$order->id,
-            'points' => (int) $payment->amount_points,
-            'wallet' => $name,
-        ], [
-            'target_type' => 'kitchen_order',
-            'target_id' => (string) $order->id,
-        ]);
+        $this->notifications->sendToUser(
+            $member,
+            $company === null ? 'kitchen_order.refunded' : 'kitchen_order.refunded_company',
+            ['order' => '#'.$order->id, 'points' => (int) $payment->amount_points] + ($company === null ? [] : ['company' => $company]),
+            [
+                'target_type' => 'kitchen_order',
+                'target_id' => (string) $order->id,
+            ],
+        );
     }
 
     /** Cash paid for an order that was not made waits at reception. */

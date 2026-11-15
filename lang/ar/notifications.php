@@ -567,7 +567,11 @@ return [
         ],
         'refunded' => [
             'title' => 'أُعيد مبلغ طلبك',
-            'body' => 'لم يُنفَّذ الطلب :order. أُعيدت :points نقطة إلى :wallet.',
+            'body' => 'لم يُنفَّذ الطلب :order. أُعيدت :points نقطة إلى محفظتك.',
+        ],
+        'refunded_company' => [
+            'title' => 'أُعيد مبلغ طلبك',
+            'body' => 'لم يُنفَّذ الطلب :order. أُعيدت :points نقطة إلى محفظة :company.',
         ],
         'cash_to_collect' => [
             'title' => 'مبلغك النقدي بانتظارك',

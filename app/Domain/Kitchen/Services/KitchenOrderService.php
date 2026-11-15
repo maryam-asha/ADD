@@ -44,8 +44,10 @@ use Throwable;
  * kitchen has not accepted it; the kitchen accepting or rejecting it, and
  * marking it ready and delivered (spec "The order"). Every change of status
  * locks the order's row and re-reads its status first, so two screens
- * acting on one order at once cannot both succeed. One lock order
- * everywhere: the bill, then the order, then its payment.
+ * acting on one order at once cannot both succeed. The lock order of this
+ * class is the bill, then the order, then its payment. The bank-callback
+ * sync takes the opposite order (payment, then order); a deadlock between
+ * the two is money-safe either way (see KitchenOrderRefunder).
  *
  * Sending checks the stock but draws none: stock is drawn when the kitchen
  * accepts (decision 7). Prices are frozen as they are when it is sent. How
@@ -350,7 +352,7 @@ class KitchenOrderService
      * still held for its card, waiting for reception or pending is cancelled
      * by the system, and what it took is given back (KitchenOrderRefunder).
      * Called with the bill's row already locked (lock order: bill, order,
-     * payment). Orders the kitchen accepted stay.
+     * payment; see KitchenOrderRefunder for the one path that differs). Orders the kitchen accepted stay.
      *
      * Each order cancelled is announced to the kitchen board and its member
      * is told, once the surrounding transaction commits. The open card of a

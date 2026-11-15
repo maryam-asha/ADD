@@ -33,7 +33,9 @@ use Database\Seeders\RoleSeeder;
 use Database\Seeders\SettingSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use App\Notifications\GeneralNotification;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -367,5 +369,36 @@ class RefundingUnmadeOrdersTest extends TestCase
 
         $this->assertSame(60, $this->balance($wallet));
         $this->assertNull(Payment::query()->forPayable($order)->sole()->refunded_at);
+    }
+
+    public function test_the_refund_notice_names_the_wallet_not_the_person(): void
+    {
+        Notification::fake();
+        $company = $this->officeStaffMember();
+        $companyWallet = Wallet::query()->create(['owner_type' => OwnerType::Company, 'owner_id' => $company->id]);
+        app(WalletService::class)->creditGeneral($companyWallet, 500, WalletTransactionSource::TopUp);
+        $this->personalWallet(100);
+
+        $this->send(['method' => 'wallet', 'wallet_owner_type' => 'user', 'wallet_owner_id' => $this->member->id])->assertCreated();
+        $personal = KitchenOrder::query()->latest('id')->firstOrFail();
+        $this->send(['method' => 'wallet', 'wallet_owner_type' => 'company', 'wallet_owner_id' => $company->id])->assertCreated();
+        $corporate = KitchenOrder::query()->latest('id')->firstOrFail();
+
+        app(KitchenOrderService::class)->reject($personal, $this->staff(), 'Closed');
+        app(KitchenOrderService::class)->reject($corporate, $this->staff(), 'Closed');
+
+        $sent = Notification::sent($this->member, GeneralNotification::class)
+            ->map(fn ($n) => $n->toArray($this->member))
+            ->filter(fn (array $d) => str_starts_with($d['template_key'], 'kitchen_order.refunded'))
+            ->values();
+
+        $this->assertCount(2, $sent);
+        $this->assertSame('kitchen_order.refunded', $sent[0]['template_key']);
+        $this->assertArrayNotHasKey('company', $sent[0]['params']);
+        $this->assertStringContainsString('your wallet', $sent[0]['body']);
+        $this->assertStringNotContainsString($this->member->name, $sent[0]['body']);
+        $this->assertSame('kitchen_order.refunded_company', $sent[1]['template_key']);
+        $this->assertSame($company->legal_name, $sent[1]['params']['company']);
+        $this->assertStringContainsString($company->legal_name, $sent[1]['body']);
     }
 }

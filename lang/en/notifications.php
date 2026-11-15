@@ -567,7 +567,11 @@ return [
         ],
         'refunded' => [
             'title' => 'Your order was refunded',
-            'body' => 'Order :order was not made. :points points were returned to :wallet.',
+            'body' => 'Order :order was not made. :points points were returned to your wallet.',
+        ],
+        'refunded_company' => [
+            'title' => 'Your order was refunded',
+            'body' => 'Order :order was not made. :points points were returned to the :company wallet.',
         ],
         'cash_to_collect' => [
             'title' => 'Your cash is waiting for you',
