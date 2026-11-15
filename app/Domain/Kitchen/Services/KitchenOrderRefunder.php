@@ -20,12 +20,16 @@ use App\Domain\Kitchen\Models\KitchenOrder;
  * Runs inside the caller's transaction, on the order it has locked. Lock
  * order here: bill, then order, then payment (the payment rows are locked
  * by this class and by PaymentService::refund). The one path that takes the
- * opposite order is the bank-callback sync, which locks the payment first
- * and then, through KitchenOrderFulfiller, the order. A callback landing
- * on the same order as a cancel can therefore deadlock; either victim is
- * safe with money: a sync that loses rolls back and the reconciler retries
- * it, and a cancel that loses fails before any refund committed, so it can
- * be sent again. Idempotent: a refunded payment is skipped and
+ * opposite order is the bank-callback sync, which locks the payment first,
+ * then credits the card's points to the wallet — touching the wallet row —
+ * and only then, through KitchenOrderFulfiller, locks the order. A callback
+ * landing on the same order as a cancel can therefore deadlock; so can one
+ * landing beside reception's accept (ReceptionOrderReview::accept: the
+ * order, then the wallet, as it takes the cash) or a bill closing (the
+ * bill, the order, then the wallet its refunds credit). Every victim is safe
+ * with money: a sync that loses rolls back and the reconciler retries it,
+ * and a cancel, an accept or a closing that loses fails before anything
+ * committed, so it can be sent again. Idempotent: a refunded payment is skipped and
  * `cash_return` is written only while empty.
  */
 class KitchenOrderRefunder
