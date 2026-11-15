@@ -69,6 +69,17 @@ class KitchenOrderNotifier
     }
 
     /**
+     * A card went through on a cash order already in the desk's queue (the
+     * member switched to cash, and the old card landed after all): the row
+     * re-fetches, so it shows the order paid instead of cash to collect.
+     * Nobody is sent a notice; the order was announced when it arrived.
+     */
+    public function paidWhileAtReception(KitchenOrder $order): void
+    {
+        $this->realtime->send(new KitchenOrderAwaitingReception($order));
+    }
+
+    /**
      * Reception let an order through: the desk drops the row, the kitchen
      * board (placed()) is told by the caller, and the member hears it is
      * being made.

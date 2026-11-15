@@ -8,10 +8,12 @@ use App\Domain\Booking\Events\CoworkingSessionPaid;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\Contracts\PaymentFulfiller;
 use App\Domain\Kitchen\Enums\KitchenOrderStatus;
+use App\Domain\Kitchen\Enums\OrderPaymentChoice;
 use App\Domain\Kitchen\Models\KitchenOrder;
 use App\Domain\Kitchen\Services\KitchenOrderNotifier;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
@@ -29,7 +31,8 @@ use App\Services\Realtime\RealtimeBroadcaster;
  * order draws its stock (KitchenOrderService::accept), so paying it only
  * marks it paid — and, for an order held for its card, lets it go on to
  * its route (KitchenOrder::releaseFromHold()), announced to whoever now
- * sees it.
+ * sees it; for a cash order already at the desk that an old card paid
+ * after all, the desk's row is told to re-fetch.
  *
  * Once its session or booking has closed, the bill's home card stays
  * awaiting_payment while an order on it is unpaid (CurrentBookingLocator,
@@ -109,6 +112,13 @@ class KitchenOrderFulfiller implements PaymentFulfiller
         if ($order->status === KitchenOrderStatus::AwaitingPayment) {
             $order->releaseFromHold();
             $this->notifier->arrived($order);
+        } elseif ($order->status === KitchenOrderStatus::AwaitingReception
+            && $order->payment_choice === OrderPaymentChoice::Cash
+            && $payment->collected_via !== PaymentMethod::Cash) {
+            // A late card on a cash order at the desk: no longer cash to
+            // collect. The desk's own cash (ReceptionOrderReview::accept)
+            // and a payment taken at send are announced by their own paths.
+            $this->notifier->paidWhileAtReception($order);
         }
 
         $bill = $order->billable;

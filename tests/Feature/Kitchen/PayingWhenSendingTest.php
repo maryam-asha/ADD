@@ -489,6 +489,53 @@ class PayingWhenSendingTest extends TestCase
         $this->assertNull(KitchenOrder::query()->sole()->payment_due_at);
     }
 
+    /**
+     * The member switched to cash but the old card could not be let go, and
+     * the bank accepts it while the order waits at the desk: the desk's row
+     * re-fetches, so it stops showing cash to collect.
+     */
+    public function test_a_late_card_on_a_cash_order_at_the_desk_tells_the_desk(): void
+    {
+        $this->personalWallet();
+        Http::fake([
+            '*/api/create-payment' => Http::response(['ErrorMessage' => 'Success', 'ErrorCode' => 0, 'Data' => ['url' => 'https://egate-t.paymera.test/start/pay-1/en', 'paymentId' => 'pay-1']]),
+            '*/api/cancel-payment' => Http::response('', 500),
+        ]);
+        $id = $this->send(['method' => 'card'], ['delivery' => ['type' => 'pickup']])->assertCreated()->json('data.id');
+        $this->send(['method' => 'cash'], ['order_id' => $id])->assertOk()->assertJsonPath('data.status', 'awaiting_reception');
+        Event::fake([KitchenOrderChanged::class, KitchenOrderAwaitingReception::class]);
+
+        $this->cardAccepted();
+
+        $order = KitchenOrder::query()->sole();
+        $this->assertSame(KitchenOrderStatus::AwaitingReception, $order->status);
+        $this->assertNotNull($order->paid_at);
+        Event::assertDispatchedTimes(KitchenOrderAwaitingReception::class, 1);
+        Event::assertDispatched(KitchenOrderAwaitingReception::class, fn (KitchenOrderAwaitingReception $e) => $e->broadcastWith() === [
+            'order_id' => $order->id, 'branch_id' => $this->branch->id, 'status' => 'awaiting_reception',
+        ]);
+        Event::assertNotDispatched(KitchenOrderChanged::class);
+    }
+
+    /** Paying at send, or the desk taking the cash, is announced once, by its own path. */
+    public function test_a_payment_the_desk_or_the_send_takes_is_not_announced_twice(): void
+    {
+        $this->personalWallet(100);
+        Event::fake([KitchenOrderAwaitingReception::class]);
+
+        $this->send(['method' => 'wallet'], ['delivery' => ['type' => 'pickup']])->assertCreated()->assertJsonPath('data.status', 'awaiting_reception');
+        Event::assertDispatchedTimes(KitchenOrderAwaitingReception::class, 1);
+
+        $cash = $this->send(['method' => 'cash'], ['delivery' => ['type' => 'pickup']])->assertCreated()->json('data.id');
+        $staff = User::factory()->create();
+        $staff->assignRole('admin');
+        Sanctum::actingAs($staff, ['*']);
+        $this->postJson("/api/v1/admin/reception/kitchen-orders/{$cash}/accept")->assertOk()->assertJsonPath('data.status', 'pending');
+
+        // The cash order's arrival, then the desk's accept: one each.
+        Event::assertDispatchedTimes(KitchenOrderAwaitingReception::class, 3);
+    }
+
     public function test_a_hold_past_its_deadline_or_someone_elses_is_not_resent(): void
     {
         $this->officeStaff();
