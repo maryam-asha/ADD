@@ -67,6 +67,7 @@ use App\Http\Controllers\Api\V1\Admin\ProviderUserController;
 use App\Http\Controllers\Api\V1\Admin\QrPointController;
 use App\Http\Controllers\Api\V1\Admin\Reception\AccessActivationController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ArrivalRequestController as ReceptionArrivalRequestController;
+use App\Http\Controllers\Api\V1\Admin\Reception\KitchenOrderReviewController;
 use App\Http\Controllers\Api\V1\Admin\Reception\BookingReceptionController;
 use App\Http\Controllers\Api\V1\Admin\Reception\CashRegisterSessionController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ItemSaleController as ReceptionItemSaleController;
@@ -489,6 +490,12 @@ Route::get('reception/sessions/{type}/{id}/report', [ReceptionSessionsController
 // A member's "end session" press, confirmed here
 // (docs/decisions/coworking-self-service-sessions.md).
 Route::post('reception/session-end-requests/{sessionEndRequest}/confirm', [SessionEndRequestController::class, 'confirm'])->middleware('permission:reception.check_in');
+
+// Kitchen orders a member sent with no bill wait here until reception has
+// seen the member is in the building (2026-11-14 spec, decision 5).
+Route::get('reception/kitchen-orders', [KitchenOrderReviewController::class, 'index'])->middleware('permission:kitchen-orders.review');
+Route::post('reception/kitchen-orders/{order}/accept', [KitchenOrderReviewController::class, 'accept'])->middleware('permission:kitchen-orders.review');
+Route::post('reception/kitchen-orders/{order}/reject', [KitchenOrderReviewController::class, 'reject'])->middleware('permission:kitchen-orders.review');
 
 Route::get('reception/arrival-requests', [ReceptionArrivalRequestController::class, 'index'])->middleware('permission:reception.view');
 Route::post('reception/arrival-requests/{arrivalRequest}/confirm', [ReceptionArrivalRequestController::class, 'confirm'])->middleware('permission:reception.check_in');

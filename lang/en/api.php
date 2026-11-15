@@ -864,6 +864,7 @@ return [
         'pickup_label' => 'Kitchen counter',
         'payment_method_not_offered' => 'That way of paying is not offered for this order.',
         'order_not_awaiting_payment' => 'This order is no longer waiting for its payment.',
+        'order_not_awaiting_reception' => 'This order is not waiting for reception any more.',
     ],
 
     // Paying for a kitchen order, its own payable (App\Domain\Kitchen).

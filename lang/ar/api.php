@@ -849,6 +849,7 @@ return [
         'pickup_label' => 'كاونتر المطبخ',
         'payment_method_not_offered' => 'طريقة الدفع هذه غير متاحة لهذا الطلب.',
         'order_not_awaiting_payment' => 'لم يعد هذا الطلب بانتظار دفعه.',
+        'order_not_awaiting_reception' => 'هذا الطلب لم يعد بانتظار الاستقبال.',
     ],
 
     // دفع طلب المطبخ، كدفعة مستقلة (App\Domain\Kitchen).

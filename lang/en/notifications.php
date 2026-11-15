@@ -577,6 +577,14 @@ return [
             'title' => 'Your cash is waiting for you',
             'body' => 'Order :order was not made. Please collect the cash you paid from reception.',
         ],
+        'accepted_by_reception' => [
+            'title' => 'Your order is confirmed',
+            'body' => 'Reception confirmed you are here. Order :order is on its way to the kitchen.',
+        ],
+        'rejected_by_reception' => [
+            'title' => 'Reception could not take your order',
+            'body' => 'Order :order was declined: :reason',
+        ],
         // Staff: whoever reviews kitchen orders (kitchen-orders.review).
         'awaiting_reception' => [
             'title' => 'A kitchen order to confirm',

@@ -68,6 +68,26 @@ class KitchenOrderNotifier
         ]);
     }
 
+    /**
+     * Reception let an order through: the desk drops the row, the kitchen
+     * board (placed()) is told by the caller, and the member hears it is
+     * being made.
+     */
+    public function acceptedByReception(KitchenOrder $order): void
+    {
+        $this->realtime->send(new KitchenOrderAwaitingReception($order), new MemberKitchenOrderUpdated($order));
+
+        $this->tellMember($order, 'kitchen_order.accepted_by_reception');
+    }
+
+    /** Reception turned an order down: the desk drops the row, the member hears why. */
+    public function rejectedByReception(KitchenOrder $order): void
+    {
+        $this->realtime->send(new KitchenOrderAwaitingReception($order), new MemberKitchenOrderUpdated($order));
+
+        $this->tellMember($order, 'kitchen_order.rejected_by_reception', ['reason' => (string) $order->rejection_reason]);
+    }
+
     /** The member took it back: the board only. */
     public function cancelledByMember(KitchenOrder $order): void
     {
@@ -138,6 +158,23 @@ class KitchenOrderNotifier
         }
 
         $this->notifications->sendToUser($member, 'kitchen_order.cash_to_collect', ['order' => '#'.$order->id], [
+            'target_type' => 'kitchen_order',
+            'target_id' => (string) $order->id,
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $placeholders
+     */
+    private function tellMember(KitchenOrder $order, string $templateKey, array $placeholders = []): void
+    {
+        $member = $order->user;
+
+        if ($member === null) {
+            return;
+        }
+
+        $this->notifications->sendToUser($member, $templateKey, ['order' => '#'.$order->id] + $placeholders, [
             'target_type' => 'kitchen_order',
             'target_id' => (string) $order->id,
         ]);
