@@ -147,6 +147,15 @@ automatically.
      a cash order, accepting records the cash in the same action
      (`settleAtReception`, exactly what is due). An order cannot be accepted as
      cash without the cash being recorded.
+     - *Correction 2026-11-15 (final review):* the build first let the desk
+       send `amount`, the money handed over. `collect()` credits all of it as
+       points and spends only what is due, so a surplus stayed in the wallet as
+       points — and if the order was then not made, "cash to return" handed
+       back the whole amount too: the surplus went back twice. Accept now takes
+       `currency` only and always records exactly what is due; change is the
+       desk's. *Given up:* recording an over-payment as points at the desk for
+       a kitchen order, which the desk's general cash settle
+       (`SettleAtReceptionRequest`) still allows elsewhere.
    - **reject, with a reason the member sees:** the order becomes `rejected` and
      a paid order is refunded (decision 4).
    - **Not answered in time** *(product owner, 2026-11-14)*: the system

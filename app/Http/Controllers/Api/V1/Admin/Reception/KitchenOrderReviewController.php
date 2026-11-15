@@ -45,15 +45,10 @@ class KitchenOrderReviewController extends Controller
         return AdminKitchenOrderResource::collection($orders);
     }
 
-    /** POST admin/reception/kitchen-orders/{order}/accept `{amount?, currency?}` — to the kitchen board. */
+    /** POST admin/reception/kitchen-orders/{order}/accept `{currency?}` — to the kitchen board. */
     public function accept(AcceptKitchenOrderRequest $request, KitchenOrder $order, ReceptionOrderReview $review): AdminKitchenOrderResource|JsonResponse
     {
-        return $this->act(fn () => $review->accept(
-            $order,
-            $request->user(),
-            $request->validated('amount') === null ? null : (string) $request->validated('amount'),
-            $request->validated('currency'),
-        ));
+        return $this->act(fn () => $review->accept($order, $request->user(), $request->validated('currency')));
     }
 
     /** POST admin/reception/kitchen-orders/{order}/reject `{reason}` */

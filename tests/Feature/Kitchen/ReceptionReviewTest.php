@@ -20,6 +20,7 @@ use App\Domain\Membership\Enums\WalletTransactionSource;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Services\WalletService;
 use App\Domain\Retail\Models\SaleItem;
+use App\Support\PlainAmount;
 use App\Notifications\GeneralNotification;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\SettingSeeder;
@@ -162,29 +163,41 @@ class ReceptionReviewTest extends TestCase
     {
         $order = $this->waiting(['paid_at' => now()]);
 
-        // A short amount is ignored: nothing is owed.
-        $this->act($order, 'accept', ['amount' => '0.01'])->assertOk();
+        $this->act($order, 'accept')->assertOk();
 
         $this->assertSame(KitchenOrderStatus::Pending, $order->refresh()->status);
         $this->assertSame(0, Payment::query()->forPayable($order)->count());
     }
 
-    public function test_cash_short_leaves_the_order_waiting(): void
+    public function test_the_desk_takes_exactly_what_is_due_and_a_refused_order_gives_back_no_more(): void
     {
         $order = $this->waiting();
-        Event::fake([KitchenOrderChanged::class, KitchenOrderAwaitingReception::class]);
+        $wallet = Wallet::query()->firstOrCreate(['owner_type' => OwnerType::User, 'owner_id' => $this->member->id]);
 
-        $this->act($order, 'accept', ['amount' => '0.01'])
-            ->assertStatus(422)
-            ->assertJsonPath('message', 'The amount received is short by 3.99 USD.')
-            ->assertJsonPath('shortage', '3.99');
+        // An amount sent along is not read: the desk takes exactly what is
+        // due, so no surplus is left in the wallet as points.
+        $this->act($order, 'accept', ['amount' => '10', 'currency' => 'USD'])->assertOk();
 
-        $order->refresh();
-        $this->assertSame(KitchenOrderStatus::AwaitingReception, $order->status);
-        $this->assertNull($order->paid_at);
-        $this->assertNull($order->reception_decided_by);
-        $this->assertSame(0, Payment::query()->forPayable($order)->count());
-        Event::assertNotDispatched(KitchenOrderChanged::class);
+        $payment = Payment::query()->forPayable($order)->sole();
+        $this->assertSame('4', PlainAmount::of((string) $payment->received_amount));
+        $this->assertSame('USD', $payment->received_currency);
+        $this->assertSame(40, (int) $payment->points_to_credit);
+        $this->assertSame(0, app(WalletService::class)->generalBalance($wallet));
+
+        // The kitchen does not make it: the cash goes back, and it is all
+        // that goes back.
+        Role::findByName('desk', 'web')->givePermissionTo('kitchen-orders.manage');
+        $this->staff->forgetCachedPermissions();
+        $this->postJson("/api/v1/admin/kitchen/orders/{$order->id}/reject", ['reason' => 'Out of cola'])->assertOk();
+
+        $row = $this->getJson("/api/v1/admin/reception/kitchen-cash-returns?branch_id={$this->branch->id}")
+            ->assertOk()
+            ->assertJsonPath('data.0.order.id', $order->id)
+            ->assertJsonPath('data.0.points', 40)
+            ->assertJsonPath('data.0.received_currency', 'USD')
+            ->json('data.0');
+        $this->assertSame('4', PlainAmount::of((string) $row['received_amount']));
+        $this->assertSame(0, app(WalletService::class)->generalBalance($wallet));
     }
 
     public function test_rejecting_refunds_and_tells_the_member(): void
@@ -280,7 +293,7 @@ class ReceptionReviewTest extends TestCase
         $order = $this->waiting();
 
         // SYP exists but has no exchange rate.
-        $this->act($order, 'accept', ['amount' => '500000', 'currency' => 'SYP'])
+        $this->act($order, 'accept', ['currency' => 'SYP'])
             ->assertStatus(422)
             ->assertJsonPath('message', __('api.payment.currency_unavailable', [], 'en'));
 

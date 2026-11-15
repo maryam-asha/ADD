@@ -32,21 +32,23 @@ class ReceptionOrderReview
 
     /**
      * Lets the order through to the kitchen board. A cash order that is not
-     * yet paid has its cash taken in the same transaction — `$amount` and
-     * `$currency` as PaymentService::settleAtReception takes them; one that
-     * is already paid (a card payment landed after the member switched to
-     * cash) collects nothing and ignores both.
+     * yet paid has its cash taken in the same transaction: exactly what is
+     * due, in `$currency` (default: the base currency). Never more — the
+     * desk gives change, and a surplus taken here would stay in the wallet
+     * as points, then go back again as cash if the order is not made. One
+     * that is already paid (a card payment landed after the member switched
+     * to cash) collects nothing and ignores `$currency`.
      *
      * @throws KitchenOrderException not awaiting reception (409)
-     * @throws \App\Domain\Booking\Exceptions\ReceptionActionException cash short (422 api.payment.amount_short); the order stays put
+     * @throws \App\Domain\Finance\Exceptions\PaymentPricingException `$currency` has no rate; nothing is written
      */
-    public function accept(KitchenOrder $order, User $staff, ?string $amount, ?string $currency): KitchenOrder
+    public function accept(KitchenOrder $order, User $staff, ?string $currency): KitchenOrder
     {
-        DB::transaction(function () use ($order, $staff, $amount, $currency) {
+        DB::transaction(function () use ($order, $staff, $currency) {
             $locked = $this->locked($order);
 
             if ($locked->payment_choice === OrderPaymentChoice::Cash && $locked->paid_at === null) {
-                $settled = $this->payments->settleAtReception(PaymentPurpose::KitchenOrder, $locked, PaymentMethod::Cash, $amount, $currency, $staff);
+                $settled = $this->payments->settleAtReception(PaymentPurpose::KitchenOrder, $locked, PaymentMethod::Cash, null, $currency, $staff);
                 $locked->refresh();
 
                 // The same entry the desk's cash path writes (ReceptionPaymentController::settle).

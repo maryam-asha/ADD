@@ -24007,7 +24007,7 @@
                                         ],
                                         "body": {
                                             "mode": "raw",
-                                            "raw": "{\n  \"amount\": \"32000\",\n  \"currency\": \"SYP\"\n}",
+                                            "raw": "{\n  \"currency\": \"SYP\"\n}",
                                             "options": {
                                                 "raw": {
                                                     "language": "json"
@@ -24029,7 +24029,7 @@
                                                 "accept"
                                             ]
                                         },
-                                        "description": "Lets an `awaiting_reception` order through: `status` becomes `pending` and the kitchen board sees it; the member is notified. A **cash** order that is not paid yet has its cash taken in the same request: `amount` (what the member handed over, required then) and `currency` (a currency code); the amount is checked against the order's points at today's rate: 422 `The amount received is short by :shortage :currency.` with `shortage` and `currency` beside the message, and the order stays in the queue; 422 when the currency has no rate yet. An order already paid (wallet, card) collects nothing and ignores both. 409 `This order is not waiting for reception any more.` Permission `kitchen-orders.review`.\n\n### Cases - see this request's saved examples\n- **Accepted** - 200, `status` pending.\n- **Cash Taken and Accepted** - 200, body `{amount, currency}`; `payment.paid` true.\n- **Error: Cash Short** - 422.\n- **Error: Currency Has No Rate** - 422, the currency has no exchange rate yet; nothing was written and the order stays in the queue.\n- **Error: Not Waiting for Reception** - 409."
+                                        "description": "Lets an `awaiting_reception` order through: `status` becomes `pending` and the kitchen board sees it; the member is notified. A **cash** order that is not paid yet has its cash taken in the same request: exactly what is due at today's rate, in `currency` (a currency code; omitted, the base currency). There is no `amount`: the desk gives change, so a surplus never stays in the wallet as points (an `amount` sent is ignored). 422 when the currency has no rate yet; nothing is written and the order stays in the queue. An order already paid (wallet, card) collects nothing and ignores `currency`. 409 `This order is not waiting for reception any more.` Permission `kitchen-orders.review`.\n\n### Cases - see this request's saved examples\n- **Accepted** - 200, `status` pending.\n- **Cash Taken and Accepted** - 200, body `{currency}`; `payment.paid` true.\n- **Error: Currency Has No Rate** - 422, the currency has no exchange rate yet; nothing was written and the order stays in the queue.\n- **Error: Not Waiting for Reception** - 409."
                                     },
                                     "response": [
                                         {
@@ -24068,7 +24068,7 @@
                                                         "accept"
                                                     ]
                                                 },
-                                                "description": "Lets an `awaiting_reception` order through: `status` becomes `pending` and the kitchen board sees it; the member is notified. A **cash** order that is not paid yet has its cash taken in the same request: `amount` (what the member handed over, required then) and `currency` (a currency code); the amount is checked against the order's points at today's rate: 422 `The amount received is short by :shortage :currency.` with `shortage` and `currency` beside the message, and the order stays in the queue; 422 when the currency has no rate yet. An order already paid (wallet, card) collects nothing and ignores both. 409 `This order is not waiting for reception any more.` Permission `kitchen-orders.review`.\n\n### Cases - see this request's saved examples\n- **Accepted** - 200, `status` pending.\n- **Cash Taken and Accepted** - 200, body `{amount, currency}`; `payment.paid` true.\n- **Error: Cash Short** - 422.\n- **Error: Currency Has No Rate** - 422, the currency has no exchange rate yet; nothing was written and the order stays in the queue.\n- **Error: Not Waiting for Reception** - 409."
+                                                "description": "Lets an `awaiting_reception` order through: `status` becomes `pending` and the kitchen board sees it; the member is notified. A **cash** order that is not paid yet has its cash taken in the same request: exactly what is due at today's rate, in `currency` (a currency code; omitted, the base currency). There is no `amount`: the desk gives change, so a surplus never stays in the wallet as points (an `amount` sent is ignored). 422 when the currency has no rate yet; nothing is written and the order stays in the queue. An order already paid (wallet, card) collects nothing and ignores `currency`. 409 `This order is not waiting for reception any more.` Permission `kitchen-orders.review`.\n\n### Cases - see this request's saved examples\n- **Accepted** - 200, `status` pending.\n- **Cash Taken and Accepted** - 200, body `{currency}`; `payment.paid` true.\n- **Error: Currency Has No Rate** - 422, the currency has no exchange rate yet; nothing was written and the order stays in the queue.\n- **Error: Not Waiting for Reception** - 409."
                                             },
                                             "status": "OK",
                                             "code": 200,
@@ -24105,7 +24105,7 @@
                                                 ],
                                                 "body": {
                                                     "mode": "raw",
-                                                    "raw": "{\n  \"amount\": \"32000\",\n  \"currency\": \"SYP\"\n}",
+                                                    "raw": "{\n  \"currency\": \"SYP\"\n}",
                                                     "options": {
                                                         "raw": {
                                                             "language": "json"
@@ -24127,7 +24127,7 @@
                                                         "accept"
                                                     ]
                                                 },
-                                                "description": "Lets an `awaiting_reception` order through: `status` becomes `pending` and the kitchen board sees it; the member is notified. A **cash** order that is not paid yet has its cash taken in the same request: `amount` (what the member handed over, required then) and `currency` (a currency code); the amount is checked against the order's points at today's rate: 422 `The amount received is short by :shortage :currency.` with `shortage` and `currency` beside the message, and the order stays in the queue; 422 when the currency has no rate yet. An order already paid (wallet, card) collects nothing and ignores both. 409 `This order is not waiting for reception any more.` Permission `kitchen-orders.review`.\n\n### Cases - see this request's saved examples\n- **Accepted** - 200, `status` pending.\n- **Cash Taken and Accepted** - 200, body `{amount, currency}`; `payment.paid` true.\n- **Error: Cash Short** - 422.\n- **Error: Currency Has No Rate** - 422, the currency has no exchange rate yet; nothing was written and the order stays in the queue.\n- **Error: Not Waiting for Reception** - 409."
+                                                "description": "Lets an `awaiting_reception` order through: `status` becomes `pending` and the kitchen board sees it; the member is notified. A **cash** order that is not paid yet has its cash taken in the same request: exactly what is due at today's rate, in `currency` (a currency code; omitted, the base currency). There is no `amount`: the desk gives change, so a surplus never stays in the wallet as points (an `amount` sent is ignored). 422 when the currency has no rate yet; nothing is written and the order stays in the queue. An order already paid (wallet, card) collects nothing and ignores `currency`. 409 `This order is not waiting for reception any more.` Permission `kitchen-orders.review`.\n\n### Cases - see this request's saved examples\n- **Accepted** - 200, `status` pending.\n- **Cash Taken and Accepted** - 200, body `{currency}`; `payment.paid` true.\n- **Error: Currency Has No Rate** - 422, the currency has no exchange rate yet; nothing was written and the order stays in the queue.\n- **Error: Not Waiting for Reception** - 409."
                                             },
                                             "status": "OK",
                                             "code": 200,
@@ -24140,65 +24140,6 @@
                                             ],
                                             "cookie": [],
                                             "body": "{\n    \"data\": {\n        \"id\": 41,\n        \"status\": \"pending\",\n        \"source\": \"app\",\n        \"delivery\": {\n            \"type\": \"pickup\",\n            \"label\": \"Kitchen counter\",\n            \"note\": null\n        },\n        \"route\": \"reception\",\n        \"bill\": null,\n        \"payment\": {\n            \"choice\": \"cash\",\n            \"wallet_owner_type\": null,\n            \"paid\": true\n        },\n        \"payment_due_at\": null,\n        \"lines\": [\n            {\n                \"sale_item_id\": 1,\n                \"name\": \"Bottled water\",\n                \"quantity\": 2,\n                \"unit_price_points\": 10,\n                \"line_points\": 20\n            },\n            {\n                \"sale_item_id\": 3,\n                \"name\": \"Chocolate bar\",\n                \"quantity\": 1,\n                \"unit_price_points\": 12,\n                \"line_points\": 12\n            }\n        ],\n        \"total_points\": 32,\n        \"rejection_reason\": null,\n        \"cancelled_by\": null,\n        \"timestamps\": {\n            \"submitted_at\": \"2026-11-11T09:30:00+00:00\",\n            \"accepted_at\": null,\n            \"ready_at\": null,\n            \"delivered_at\": null\n        },\n        \"paid\": true,\n        \"cash_return\": null,\n        \"cash_due_points\": null,\n        \"member\": {\n            \"id\": 5,\n            \"name\": \"Demo Member\",\n            \"phone\": \"+963900000000\"\n        },\n        \"waited_seconds\": 95\n    }\n}"
-                                        },
-                                        {
-                                            "name": "Error: Cash Short",
-                                            "originalRequest": {
-                                                "method": "POST",
-                                                "header": [
-                                                    {
-                                                        "key": "lang",
-                                                        "value": "{{lang}}",
-                                                        "type": "text"
-                                                    },
-                                                    {
-                                                        "key": "Accept",
-                                                        "value": "application/json",
-                                                        "type": "text"
-                                                    },
-                                                    {
-                                                        "key": "Content-Type",
-                                                        "value": "application/json",
-                                                        "type": "text"
-                                                    }
-                                                ],
-                                                "body": {
-                                                    "mode": "raw",
-                                                    "raw": "{\n  \"amount\": \"32000\",\n  \"currency\": \"SYP\"\n}",
-                                                    "options": {
-                                                        "raw": {
-                                                            "language": "json"
-                                                        }
-                                                    }
-                                                },
-                                                "url": {
-                                                    "raw": "{{base_url}}/api/v1/admin/reception/kitchen-orders/{{kitchen_order_id}}/accept",
-                                                    "host": [
-                                                        "{{base_url}}"
-                                                    ],
-                                                    "path": [
-                                                        "api",
-                                                        "v1",
-                                                        "admin",
-                                                        "reception",
-                                                        "kitchen-orders",
-                                                        "{{kitchen_order_id}}",
-                                                        "accept"
-                                                    ]
-                                                },
-                                                "description": "Lets an `awaiting_reception` order through: `status` becomes `pending` and the kitchen board sees it; the member is notified. A **cash** order that is not paid yet has its cash taken in the same request: `amount` (what the member handed over, required then) and `currency` (a currency code); the amount is checked against the order's points at today's rate: 422 `The amount received is short by :shortage :currency.` with `shortage` and `currency` beside the message, and the order stays in the queue; 422 when the currency has no rate yet. An order already paid (wallet, card) collects nothing and ignores both. 409 `This order is not waiting for reception any more.` Permission `kitchen-orders.review`.\n\n### Cases - see this request's saved examples\n- **Accepted** - 200, `status` pending.\n- **Cash Taken and Accepted** - 200, body `{amount, currency}`; `payment.paid` true.\n- **Error: Cash Short** - 422.\n- **Error: Currency Has No Rate** - 422, the currency has no exchange rate yet; nothing was written and the order stays in the queue.\n- **Error: Not Waiting for Reception** - 409."
-                                            },
-                                            "status": "Unprocessable Entity",
-                                            "code": 422,
-                                            "_postman_previewlanguage": "json",
-                                            "header": [
-                                                {
-                                                    "key": "Content-Type",
-                                                    "value": "application/json"
-                                                }
-                                            ],
-                                            "cookie": [],
-                                            "body": "{\n    \"message\": \"The amount received is short by 2000 SYP.\",\n    \"shortage\": \"2000\",\n    \"currency\": \"SYP\"\n}"
                                         },
                                         {
                                             "name": "Error: Currency Has No Rate",
@@ -24223,7 +24164,7 @@
                                                 ],
                                                 "body": {
                                                     "mode": "raw",
-                                                    "raw": "{\n  \"amount\": \"32000\",\n  \"currency\": \"XYZ\"\n}",
+                                                    "raw": "{\n  \"currency\": \"XYZ\"\n}",
                                                     "options": {
                                                         "raw": {
                                                             "language": "json"
@@ -24245,7 +24186,7 @@
                                                         "accept"
                                                     ]
                                                 },
-                                                "description": "Lets an `awaiting_reception` order through: `status` becomes `pending` and the kitchen board sees it; the member is notified. A **cash** order that is not paid yet has its cash taken in the same request: `amount` (what the member handed over, required then) and `currency` (a currency code); the amount is checked against the order's points at today's rate: 422 `The amount received is short by :shortage :currency.` with `shortage` and `currency` beside the message, and the order stays in the queue; 422 when the currency has no rate yet. An order already paid (wallet, card) collects nothing and ignores both. 409 `This order is not waiting for reception any more.` Permission `kitchen-orders.review`.\n\n### Cases - see this request's saved examples\n- **Accepted** - 200, `status` pending.\n- **Cash Taken and Accepted** - 200, body `{amount, currency}`; `payment.paid` true.\n- **Error: Cash Short** - 422.\n- **Error: Currency Has No Rate** - 422, the currency has no exchange rate yet; nothing was written and the order stays in the queue.\n- **Error: Not Waiting for Reception** - 409."
+                                                "description": "Lets an `awaiting_reception` order through: `status` becomes `pending` and the kitchen board sees it; the member is notified. A **cash** order that is not paid yet has its cash taken in the same request: exactly what is due at today's rate, in `currency` (a currency code; omitted, the base currency). There is no `amount`: the desk gives change, so a surplus never stays in the wallet as points (an `amount` sent is ignored). 422 when the currency has no rate yet; nothing is written and the order stays in the queue. An order already paid (wallet, card) collects nothing and ignores `currency`. 409 `This order is not waiting for reception any more.` Permission `kitchen-orders.review`.\n\n### Cases - see this request's saved examples\n- **Accepted** - 200, `status` pending.\n- **Cash Taken and Accepted** - 200, body `{currency}`; `payment.paid` true.\n- **Error: Currency Has No Rate** - 422, the currency has no exchange rate yet; nothing was written and the order stays in the queue.\n- **Error: Not Waiting for Reception** - 409."
                                             },
                                             "status": "Unprocessable Entity",
                                             "code": 422,
@@ -24295,7 +24236,7 @@
                                                         "accept"
                                                     ]
                                                 },
-                                                "description": "Lets an `awaiting_reception` order through: `status` becomes `pending` and the kitchen board sees it; the member is notified. A **cash** order that is not paid yet has its cash taken in the same request: `amount` (what the member handed over, required then) and `currency` (a currency code); the amount is checked against the order's points at today's rate: 422 `The amount received is short by :shortage :currency.` with `shortage` and `currency` beside the message, and the order stays in the queue; 422 when the currency has no rate yet. An order already paid (wallet, card) collects nothing and ignores both. 409 `This order is not waiting for reception any more.` Permission `kitchen-orders.review`.\n\n### Cases - see this request's saved examples\n- **Accepted** - 200, `status` pending.\n- **Cash Taken and Accepted** - 200, body `{amount, currency}`; `payment.paid` true.\n- **Error: Cash Short** - 422.\n- **Error: Currency Has No Rate** - 422, the currency has no exchange rate yet; nothing was written and the order stays in the queue.\n- **Error: Not Waiting for Reception** - 409."
+                                                "description": "Lets an `awaiting_reception` order through: `status` becomes `pending` and the kitchen board sees it; the member is notified. A **cash** order that is not paid yet has its cash taken in the same request: exactly what is due at today's rate, in `currency` (a currency code; omitted, the base currency). There is no `amount`: the desk gives change, so a surplus never stays in the wallet as points (an `amount` sent is ignored). 422 when the currency has no rate yet; nothing is written and the order stays in the queue. An order already paid (wallet, card) collects nothing and ignores `currency`. 409 `This order is not waiting for reception any more.` Permission `kitchen-orders.review`.\n\n### Cases - see this request's saved examples\n- **Accepted** - 200, `status` pending.\n- **Cash Taken and Accepted** - 200, body `{currency}`; `payment.paid` true.\n- **Error: Currency Has No Rate** - 422, the currency has no exchange rate yet; nothing was written and the order stays in the queue.\n- **Error: Not Waiting for Reception** - 409."
                                             },
                                             "status": "Conflict",
                                             "code": 409,
