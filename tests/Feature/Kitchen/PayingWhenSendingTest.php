@@ -35,11 +35,15 @@ use App\Domain\Retail\Models\SaleItem;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\SettingSeeder;
 use Illuminate\Broadcasting\PrivateChannel;
+use Illuminate\Cache\ArrayStore;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
+use RuntimeException;
 use Tests\TestCase;
 
 /**
@@ -385,6 +389,49 @@ class PayingWhenSendingTest extends TestCase
         Http::assertSent(fn ($request) => str_ends_with($request->url(), '/api/cancel-payment') && $request['payment_id'] === 'pay-2');
         $this->assertSame(0, Payment::query()->where('status', PaymentStatus::Pending)->count());
         $this->assertSame(60, $this->balance($wallet));
+    }
+
+    /**
+     * The switch has committed when the old card is let go, so a cache that
+     * cannot be reached for the card's lock is logged and left to the
+     * reconciler, as a gateway that cannot be reached is: the member still
+     * hears that the order was paid, and is not told to retry a switch that
+     * already happened.
+     */
+    public function test_a_cache_failure_letting_the_old_card_go_does_not_fail_the_switch(): void
+    {
+        $this->officeStaff();
+        $wallet = $this->personalWallet(100);
+        Http::fake([
+            '*/api/create-payment' => Http::response(['ErrorMessage' => 'Success', 'ErrorCode' => 0, 'Data' => ['url' => 'https://egate-t.paymera.test/start/pay-1/en', 'paymentId' => 'pay-1']]),
+            '*/api/cancel-payment' => Http::response(['ErrorMessage' => 'Success', 'ErrorCode' => 0]),
+        ]);
+        $id = $this->send(['method' => 'card'])->assertCreated()->json('data.id');
+        $card = Payment::query()->where('payment_id', 'pay-1')->sole();
+
+        // The cache goes down for the card's lock alone.
+        $store = new class("payments:payment:{$card->id}") extends ArrayStore
+        {
+            public function __construct(private readonly string $unreachable)
+            {
+                parent::__construct();
+            }
+
+            public function lock($name, $seconds = 0, $owner = null)
+            {
+                return $name === $this->unreachable ? throw new RuntimeException('cache down') : parent::lock($name, $seconds, $owner);
+            }
+        };
+        Cache::extend('flaky', fn () => Cache::repository($store));
+        config(['cache.stores.flaky' => ['driver' => 'flaky'], 'cache.default' => 'flaky']);
+        Log::spy();
+
+        $this->send(['method' => 'wallet'], ['order_id' => $id])->assertOk()->assertJsonPath('data.paid', true);
+
+        $this->assertSame(PaymentStatus::Pending, $card->refresh()->status);
+        $this->assertSame(60, $this->balance($wallet));
+        Http::assertNotSent(fn ($request) => str_ends_with($request->url(), '/api/cancel-payment'));
+        Log::shouldHaveReceived('warning')->withArgs(fn (string $message, array $context) => $context['payment_id'] === $card->id && $context['error'] === 'cache down');
     }
 
     /**

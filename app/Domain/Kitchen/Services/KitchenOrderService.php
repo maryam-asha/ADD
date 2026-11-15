@@ -234,13 +234,21 @@ class KitchenOrderService
     public function cancelOpenCards(array $paymentIds): void
     {
         foreach ($paymentIds as $id) {
-            $lock = Cache::lock("payments:payment:{$id}", 30);
+            $lock = null;
+            $held = false;
 
-            if (! $lock->get()) {
-                continue;
-            }
-
+            // Taking the lock is inside the try too: the switch has already
+            // committed, so a cache that cannot be reached is logged and left
+            // to the reconciler like a gateway that cannot be - never a 500
+            // that sends the member to retry a switch already made.
             try {
+                $lock = Cache::lock("payments:payment:{$id}", 30);
+
+                if (! $lock->get()) {
+                    continue;
+                }
+
+                $held = true;
                 $payment = Payment::query()->find($id);
 
                 if ($payment === null || $payment->status !== PaymentStatus::Pending) {
@@ -255,7 +263,10 @@ class KitchenOrderService
                     'error' => $e->getMessage(),
                 ]);
             } finally {
-                $lock->release();
+                // Nor may letting it go fail the member: it expires on its own.
+                if ($held) {
+                    rescue(fn () => $lock?->release(), report: false);
+                }
             }
         }
     }
