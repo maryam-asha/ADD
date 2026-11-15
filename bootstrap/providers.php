@@ -8,6 +8,7 @@ use App\Providers\MorphMapServiceProvider;
 use App\Providers\NotificationServiceProvider;
 use App\Providers\OtpServiceProvider;
 use App\Providers\PaymentServiceProvider;
+use App\Providers\PmIntegrationServiceProvider;
 
 return [
     AppServiceProvider::class,
@@ -18,4 +19,5 @@ return [
     NotificationServiceProvider::class,
     OtpServiceProvider::class,
     PaymentServiceProvider::class,
+    PmIntegrationServiceProvider::class,
 ];

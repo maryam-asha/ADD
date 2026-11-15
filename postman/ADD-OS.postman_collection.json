@@ -54376,6 +54376,880 @@
                     ]
                 }
             ]
+        },
+        {
+            "name": "PM (Dashboard)",
+            "description": "Project management package (packages/add/pm) mounted at /api/v1/pm: dashboard credentials (abilities:dashboard), no role check. Each route judges its own access: pm.projects.manage (assignable from the roles screen; admin holds all) for creating and editing projects, their team and tags; pm.projects.view for read-only access to every project; otherwise membership or lead of the project. A project the caller cannot see answers 404. Refusals carry a stable `code` (project_archived 409; task_forbidden and assign_forbidden 403); validation errors are 422 on the field.",
+            "item": [
+                {
+                    "name": "People",
+                    "description": "The directory used to pick leads, members and assignees. Any signed-in dashboard user.",
+                    "item": [
+                        {
+                            "name": "Search people",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/pm/people?q=%D9%85",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "pm",
+                                        "people"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "q",
+                                            "value": "%D9%85"
+                                        }
+                                    ]
+                                },
+                                "description": "Needs pm.projects.manage (403 otherwise). Up to 20 people whose name matches `q` (empty `q` lists the first 20). Answers `{data: [{id, name, avatar_url}]}`."
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Projects",
+                    "description": "Visibility: a project is seen by its members, its lead and anyone holding pm.projects.view (or manage); everyone else gets 404. Creating, editing and the team need pm.projects.manage (403 without it). On an archived project every write answers 409 `{message, code: \"project_archived\"}`.",
+                    "item": [
+                        {
+                            "name": "List projects",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/pm/projects?archived=0",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "pm",
+                                        "projects"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "archived",
+                                            "value": "0"
+                                        }
+                                    ]
+                                },
+                                "description": "The projects the caller can see, ordered by name, each with `counts {total, done, open, overdue}` and `can {manage, lead}`. Archived projects are left out unless `archived=1`."
+                            }
+                        },
+                        {
+                            "name": "Get project",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/pm/projects/1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "pm",
+                                        "projects",
+                                        "1"
+                                    ]
+                                },
+                                "description": "One project: `{data: {id, name, description, tone, starts_on, ends_on, is_archived, lead, members, counts, can}}`. A person who cannot see the project gets 404 (never 403), before anything is validated."
+                            }
+                        },
+                        {
+                            "name": "Create project",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/pm/projects",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "pm",
+                                        "projects"
+                                    ]
+                                },
+                                "description": "Needs pm.projects.manage. `name` and `tone` (olive|teal|slate|green|cyan|stone) are required; dates are Y-m-d and `ends_on` may not precede `starts_on`; `members` are user ids from the people search. The lead, if sent, must be among `members` (422 on `lead_user_id` otherwise). Answers 201 `{data}`.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"name\": \"\u062a\u0637\u0648\u064a\u0631 \u0627\u0644\u0645\u0648\u0642\u0639\",\n  \"description\": \"\u0625\u0639\u0627\u062f\u0629 \u062a\u0635\u0645\u064a\u0645 \u0627\u0644\u0645\u0648\u0642\u0639 \u0627\u0644\u062a\u0639\u0631\u064a\u0641\u064a \u0648\u0625\u0637\u0644\u0627\u0642\u0647\",\n  \"tone\": \"teal\",\n  \"starts_on\": \"2026-12-01\",\n  \"ends_on\": \"2027-02-28\",\n  \"lead_user_id\": 2,\n  \"members\": [\n    2,\n    3,\n    4\n  ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Update project",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/pm/projects/1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "pm",
+                                        "projects",
+                                        "1"
+                                    ]
+                                },
+                                "description": "Needs pm.projects.manage. Only the fields sent change; `is_archived` archives or restores. The team is NOT editable here (`members` is prohibited, use Replace members); a new `lead_user_id` must already be on the team. 422 on `ends_on` before `starts_on`.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"name\": \"\u062a\u0637\u0648\u064a\u0631 \u0627\u0644\u0645\u0648\u0642\u0639 - \u0627\u0644\u0645\u0631\u062d\u0644\u0629 \u0627\u0644\u0623\u0648\u0644\u0649\",\n  \"tone\": \"olive\",\n  \"is_archived\": false\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Replace members",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/pm/projects/1/members",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "pm",
+                                        "projects",
+                                        "1",
+                                        "members"
+                                    ]
+                                },
+                                "description": "Needs pm.projects.manage. The whole team as user ids (the list may be empty); anyone not in it is removed. Answers `{message, data}`.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"members\": [\n    2,\n    3,\n    4,\n    5\n  ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Project tasks",
+                    "description": "Board and list data for one project. Reading needs only to see the project (404 otherwise). Writes: the lead and pm.projects.manage may do everything; a member may create tasks only for themselves (403 `assign_forbidden` otherwise), edit or delete only a task they created for themselves, and move only a task assigned to them (403 `task_forbidden`); a viewer (pm.projects.view, not a member) is read-only. On an archived project every write answers 409 `{message, code: \"project_archived\"}`. 422 codes on the field named: `assignee_not_member` (assignee_ids.N), `due_before_start` (due_on), `subtask_depth` (parent_id).",
+                    "item": [
+                        {
+                            "name": "List project tasks",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/pm/projects/1/tasks?assignee=2&status=todo&priority=high&tag=1&due=week&q=%D9%88%D8%A7%D8%AC%D9%87%D8%A9",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "pm",
+                                        "projects",
+                                        "1",
+                                        "tasks"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "assignee",
+                                            "value": "2"
+                                        },
+                                        {
+                                            "key": "status",
+                                            "value": "todo"
+                                        },
+                                        {
+                                            "key": "priority",
+                                            "value": "high"
+                                        },
+                                        {
+                                            "key": "tag",
+                                            "value": "1"
+                                        },
+                                        {
+                                            "key": "due",
+                                            "value": "week"
+                                        },
+                                        {
+                                            "key": "q",
+                                            "value": "%D9%88%D8%A7%D8%AC%D9%87%D8%A9"
+                                        }
+                                    ]
+                                },
+                                "description": "Top-level tasks of the project ordered by column position (subtasks are counted on their parent in `subtask_counts`). Every filter is optional and they combine: assignee (user id), status (todo|in_progress|review|done), priority (urgent|high|normal|low), tag (tag id), due (overdue|today|week|none), q (text in the title). Answers `{data: [task]}`; each task carries `can {edit, move, assign, delete...}` for the caller."
+                            }
+                        },
+                        {
+                            "name": "Create task",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/pm/projects/1/tasks",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "pm",
+                                        "projects",
+                                        "1",
+                                        "tasks"
+                                    ]
+                                },
+                                "description": "Needs the lead, a member or pm.projects.manage. `title` required; `status` defaults to todo and the task goes to the end of its column; `parent_id` makes it a subtask (one level only: 422 `subtask_depth`); assignees must be project members (422 `assignee_not_member`); `due_on` may not precede `starts_on` (422 `due_before_start`). A plain member sending assignees other than themselves gets 403 `assign_forbidden`; leaving them out assigns the member. Answers 201 `{data: task}`.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"title\": \"\u062a\u062c\u0647\u064a\u0632 \u0627\u0644\u0645\u062d\u062a\u0648\u0649\",\n  \"description\": \"\u062c\u0645\u0639 \u0627\u0644\u0646\u0635\u0648\u0635 \u0648\u0627\u0644\u0635\u0648\u0631 \u0645\u0646 \u0627\u0644\u0623\u0642\u0633\u0627\u0645\",\n  \"status\": \"todo\",\n  \"priority\": \"high\",\n  \"starts_on\": \"2026-12-01\",\n  \"due_on\": \"2026-12-10\",\n  \"estimate_hours\": 6.5,\n  \"parent_id\": null,\n  \"assignee_ids\": [\n    2\n  ],\n  \"tag_ids\": [\n    1\n  ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Tasks",
+                    "description": "One task by id. A person who cannot see the project gets 404 (never 403), before anything is validated. On an archived project every write answers 409 `{message, code: \"project_archived\"}`.",
+                    "item": [
+                        {
+                            "name": "Get task",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/pm/tasks/1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "pm",
+                                        "tasks",
+                                        "1"
+                                    ]
+                                },
+                                "description": "Answers `{data: task}` with `subtasks` listed in full, `assignees`, `tags`, `subtask_counts {total, done}` and `can` for the caller."
+                            }
+                        },
+                        {
+                            "name": "Update task",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/pm/tasks/1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "pm",
+                                        "tasks",
+                                        "1"
+                                    ]
+                                },
+                                "description": "Only the fields sent change. Needs `can.edit` (lead, manage, or a member on a task they created for themselves; else 403 `task_forbidden`); changing assignees needs `can.assign` unless it is just the caller (403 `assign_forbidden`). Setting `status` to done stamps `completed_at`; moving off done clears it. 422 `due_before_start` is checked against the stored date for the end not sent. A task with subtasks cannot become a subtask (`subtask_depth`).",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"title\": \"\u062a\u062c\u0647\u064a\u0632 \u0627\u0644\u0645\u062d\u062a\u0648\u0649 \u0627\u0644\u0646\u0647\u0627\u0626\u064a\",\n  \"status\": \"in_progress\",\n  \"priority\": \"urgent\",\n  \"due_on\": \"2026-12-12\",\n  \"assignee_ids\": [\n    2,\n    3\n  ],\n  \"tag_ids\": [\n    1,\n    2\n  ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Delete task",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/pm/tasks/1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "pm",
+                                        "tasks",
+                                        "1"
+                                    ]
+                                },
+                                "description": "Needs `can.delete`: the lead, pm.projects.manage, or a member on a task they created for themselves (403 `task_forbidden` otherwise). Its subtasks go with it. Answers `{message}`."
+                            }
+                        },
+                        {
+                            "name": "Move task",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/pm/tasks/1/move",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "pm",
+                                        "tasks",
+                                        "1",
+                                        "move"
+                                    ]
+                                },
+                                "description": "Dropping a card on the board: `status` is the destination column (required) and `order` the ids of that column top to bottom as the person left it (optional, max 500). A member may move only a task assigned to them (403 `task_forbidden`); a viewer never. Answers `{data: task}`.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"status\": \"review\",\n  \"order\": [\n    7,\n    1,\n    9\n  ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "My tasks",
+                    "description": "What belongs to the signed-in person across projects. Needs only a dashboard session; it reads nothing but the caller's own tasks, in projects they can still see.",
+                    "item": [
+                        {
+                            "name": "List my tasks",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/pm/tasks?scope=assigned&status=todo&priority=high&due=today",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "pm",
+                                        "tasks"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "scope",
+                                            "value": "assigned"
+                                        },
+                                        {
+                                            "key": "status",
+                                            "value": "todo"
+                                        },
+                                        {
+                                            "key": "priority",
+                                            "value": "high"
+                                        },
+                                        {
+                                            "key": "due",
+                                            "value": "today"
+                                        }
+                                    ]
+                                },
+                                "description": "`scope`: assigned (default, tasks on me), created (tasks I made) or all. Accepts the same filters as the project list (assignee, status, priority, tag, due, q). Ordered by due date, undated last. Answers `{data: [task]}`."
+                            }
+                        },
+                        {
+                            "name": "My task counts",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/pm/tasks/counts",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "pm",
+                                        "tasks",
+                                        "counts"
+                                    ]
+                                },
+                                "description": "The four numbers above My tasks, over what is assigned to the caller: `{data: {overdue, today, week, completed}}`."
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Tags",
+                    "description": "Shared coloured labels. Reading needs a dashboard session; writing needs pm.projects.manage (403 without it). Names are unique (422).",
+                    "item": [
+                        {
+                            "name": "List tags",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/pm/tags",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "pm",
+                                        "tags"
+                                    ]
+                                },
+                                "description": "Ordered by name. Answers `{data: [{id, name, tone}]}`."
+                            }
+                        },
+                        {
+                            "name": "Create tag",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/pm/tags",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "pm",
+                                        "tags"
+                                    ]
+                                },
+                                "description": "`name` (max 48, unique) and `tone` (olive|teal|slate|green|cyan|stone) required. Answers 201 `{data: {id, name, tone}}`.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"name\": \"\u0639\u0627\u062c\u0644\",\n  \"tone\": \"olive\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Update tag",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/pm/tags/1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "pm",
+                                        "tags",
+                                        "1"
+                                    ]
+                                },
+                                "description": "Only the fields sent change; the name must stay unique.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"name\": \"\u0645\u0631\u0627\u062c\u0639\u0629\",\n  \"tone\": \"cyan\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Delete tag",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/pm/tags/1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "pm",
+                                        "tags",
+                                        "1"
+                                    ]
+                                },
+                                "description": "Answers `{message}`."
+                            }
+                        }
+                    ]
+                }
+            ]
         }
     ]
 }

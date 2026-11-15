@@ -1,0 +1,71 @@
+<?php
+
+namespace Add\Pm\Tests;
+
+use Add\Pm\Pm;
+use Add\Pm\PmServiceProvider;
+use Add\Pm\Tests\Fixtures\User;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Gate;
+use Orchestra\Testbench\TestCase as Orchestra;
+
+abstract class TestCase extends Orchestra
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // A column missing from a model's $fillable fails loudly instead of
+        // being dropped without a trace.
+        Model::preventSilentlyDiscardingAttributes();
+
+        Gate::before(fn ($user, string $ability) => in_array($ability, $user->abilities ?? [], true) ? true : null);
+    }
+
+    protected function getPackageProviders($app): array
+    {
+        return [PmServiceProvider::class];
+    }
+
+    protected function defineEnvironment($app): void
+    {
+        $app['config']->set('database.default', 'testing');
+        $app['config']->set('auth.providers.users.model', User::class);
+        // SQLite ignores foreign keys unless asked, and the cascades in the
+        // schema are part of what the tests check.
+        $app['config']->set('database.connections.testing.foreign_key_constraints', true);
+    }
+
+    /**
+     * Mounted the way a host does it (ADD: routes/api.php), behind its own
+     * authentication.
+     */
+    protected function defineRoutes($router): void
+    {
+        $router->middleware(['api', 'auth'])->prefix('api/pm')->group(fn () => Pm::adminRoutes());
+    }
+
+    protected function defineDatabaseMigrations(): void
+    {
+        $this->loadMigrationsFrom(__DIR__.'/Fixtures/migrations');
+    }
+
+    /**
+     * @param  list<string>  $abilities
+     */
+    protected function actingAsWith(array $abilities = []): User
+    {
+        $user = User::query()->create([
+            'name' => 'Tester '.uniqid(),
+            'email' => uniqid().'@example.test',
+            'abilities' => $abilities,
+        ]);
+
+        $this->actingAs($user);
+
+        return $user;
+    }
+}

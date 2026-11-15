@@ -2,6 +2,7 @@
 
 use Add\Hr\Hr;
 use Add\Inventory\Inventory;
+use Add\Pm\Pm;
 use App\Http\Controllers\Api\V1\Paymera\PaymeraCallbackController;
 use Illuminate\Support\Facades\Route;
 
@@ -80,6 +81,15 @@ Route::prefix('v1')->group(function () {
      * on its permissions alone.
      */
     Route::middleware(['auth:sanctum', 'abilities:dashboard'])->prefix('inventory')->group(fn () => Inventory::adminRoutes());
+
+    /*
+     * Project management (packages/add/pm): projects, their members and tasks.
+     * Open to every dashboard account behind 'abilities:dashboard'; the group
+     * checks neither a role nor a permission, because who may see a project
+     * depends on being its member. Each route judges membership or its own
+     * can:pm.* permission itself.
+     */
+    Route::middleware(['auth:sanctum', 'abilities:dashboard'])->prefix('pm')->group(fn () => Pm::adminRoutes());
 
     /*
      * Paymera's two return paths. Unauthenticated by necessity: the gateway
