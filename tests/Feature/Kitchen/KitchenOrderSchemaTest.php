@@ -54,17 +54,26 @@ class KitchenOrderSchemaTest extends TestCase
         $this->assertSame(['pending', 'preparing', 'ready'], KitchenOrderStatus::kitchenBoardValues());
     }
 
-    public function test_existing_orders_reached_the_kitchen_when_sent(): void
+    /**
+     * An order still pending when this ships starts its accept window at the
+     * deploy, not when it was sent: otherwise the job's first minute would
+     * cancel, and tell the member about, every pending order older than the
+     * window. Every other order reached the kitchen when it was sent.
+     */
+    public function test_existing_orders_reached_the_kitchen_when_sent_and_pending_ones_at_the_deploy(): void
     {
-        $order = KitchenOrder::factory()->create();
+        $this->freezeTime();
+        $pending = KitchenOrder::factory()->create();
+        $delivered = KitchenOrder::factory()->create(['status' => KitchenOrderStatus::Delivered]);
         $sent = now()->subHour()->startOfSecond();
-        KitchenOrder::query()->whereKey($order->id)->update(['created_at' => $sent, 'reached_kitchen_at' => null]);
+        KitchenOrder::query()->update(['created_at' => $sent, 'reached_kitchen_at' => null]);
 
         $migration = require database_path('migrations/2026_11_14_100000_kitchen_orders_without_a_bill.php');
         $migration->down();
         $migration->up();
 
-        $this->assertEquals($sent, $order->fresh()->reached_kitchen_at);
+        $this->assertEquals(now()->startOfSecond(), $pending->fresh()->reached_kitchen_at);
+        $this->assertEquals($sent, $delivered->fresh()->reached_kitchen_at);
     }
 
     public function test_orders_already_waiting_at_reception_reached_it_when_sent(): void

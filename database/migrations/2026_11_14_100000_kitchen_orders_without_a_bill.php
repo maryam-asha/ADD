@@ -11,7 +11,10 @@ return new class extends Migration
      * An order may stand without a bill: paid at send, or waiting for
      * reception. So the bill is optional, and the order records where it was
      * routed, how the member chose to pay, and when it reached the kitchen
-     * (for the accept window). Orders sent before this reached it when sent.
+     * (for the accept window). Orders sent before this reached it when
+     * sent — except one still pending, which starts its window now: from
+     * created_at, the job's first minute after the deploy would cancel, and
+     * tell the member about, every pending order older than the window.
      */
     public function up(): void
     {
@@ -33,11 +36,15 @@ return new class extends Migration
             $table->index(['branch_id', 'status']);
         });
 
-        DB::table('kitchen_orders')->update(['reached_kitchen_at' => DB::raw('created_at')]);
+        DB::table('kitchen_orders')->where('status', 'pending')->update(['reached_kitchen_at' => now()]);
+        DB::table('kitchen_orders')->where('status', '!=', 'pending')->update(['reached_kitchen_at' => DB::raw('created_at')]);
     }
 
     public function down(): void
     {
+        // `billable_type` and `billable_id` stay nullable: orders without a
+        // bill may exist by now, and making the columns required again would
+        // fail on those rows.
         Schema::table('kitchen_orders', function (Blueprint $table) {
             $table->dropIndex(['status', 'reached_kitchen_at']);
             $table->dropIndex(['branch_id', 'status']);
