@@ -110,10 +110,16 @@ class KitchenOrder extends Model
         return $this->hasMany(KitchenOrderLine::class);
     }
 
-    /** The payment that settled the order, the latest accepted one — eager-loadable for a list. */
+    /**
+     * The payment that settled the order, the latest accepted one — eager-loadable
+     * for a list. The status sits inside the ofMany sub-query, so a later payment
+     * that is not accepted (needs review, pending) does not hide it. A refunded
+     * payment keeps its accepted status and still counts: whose wallet paid is
+     * true of an order that was refunded too.
+     */
     public function acceptedPayment(): MorphOne
     {
-        return $this->morphOne(Payment::class, 'payable')->where('status', PaymentStatus::Accepted)->ofMany('id', 'max');
+        return $this->morphOne(Payment::class, 'payable')->ofMany(['id' => 'max'], fn (Builder $query) => $query->where('status', PaymentStatus::Accepted));
     }
 
     /** The coworking session or booking the order is billed to. */

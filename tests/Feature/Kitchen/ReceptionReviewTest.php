@@ -343,4 +343,17 @@ class ReceptionReviewTest extends TestCase
         ]);
         Event::assertDispatched(KitchenOrderChanged::class);
     }
+
+    public function test_a_later_payment_that_is_not_accepted_does_not_hide_the_wallet_that_paid(): void
+    {
+        $wallet = Wallet::query()->firstOrCreate(['owner_type' => OwnerType::User, 'owner_id' => $this->member->id]);
+        $order = $this->waiting(['payment_choice' => OrderPaymentChoice::Wallet, 'paid_at' => now()]);
+        Payment::factory()->accepted()->forPayable($order)->create(['wallet_id' => $wallet->id, 'user_id' => $this->member->id]);
+        Payment::factory()->forPayable($order)->create(['status' => PaymentStatus::NeedsReview, 'wallet_id' => $wallet->id, 'user_id' => $this->member->id]);
+
+        $this->getJson('/api/v1/admin/reception/kitchen-orders')
+            ->assertOk()
+            ->assertJsonPath('data.0.payment.wallet_owner_type', 'user')
+            ->assertJsonPath('data.0.payment.paid', true);
+    }
 }
