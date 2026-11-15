@@ -92,6 +92,21 @@ class ProjectsTest extends TestCase
             ->assertUnprocessable()->assertJsonValidationErrors('members.0');
     }
 
+    public function test_validation_messages_are_the_packages_own_in_arabic(): void
+    {
+        $this->actingAsWith(['pm.projects.manage']);
+        app()->setLocale('ar');
+
+        $dates = $this->postJson('/api/pm/projects', [
+            'name' => 'X', 'tone' => 'teal', 'starts_on' => '2026-12-01', 'ends_on' => '2026-11-01',
+        ])->assertUnprocessable()->json('errors.ends_on.0');
+        $person = $this->postJson('/api/pm/projects', ['name' => 'X', 'tone' => 'teal', 'members' => [9999]])
+            ->assertUnprocessable()->json('errors')['members.0'][0];
+
+        $this->assertDoesNotMatchRegularExpression('/[A-Za-z]/', $dates);
+        $this->assertDoesNotMatchRegularExpression('/[A-Za-z0-9]/', $person);
+    }
+
     public function test_a_member_lists_only_their_projects(): void
     {
         $me = $this->actingAsWith();

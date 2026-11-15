@@ -53026,7 +53026,7 @@
                                         }
                                     ]
                                 },
-                                "description": "Up to 20 people whose name matches `q` (empty `q` lists the first 20). Answers `{data: [{id, name, avatar_url}]}`."
+                                "description": "Needs pm.projects.manage (403 otherwise). Up to 20 people whose name matches `q` (empty `q` lists the first 20). Answers `{data: [{id, name, avatar_url}]}`."
                             }
                         }
                     ]

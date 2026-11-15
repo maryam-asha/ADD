@@ -12,7 +12,11 @@ return [
     'project_archived' => 'This project is archived, so its tasks can no longer be changed.',
     'task_deleted' => 'Task deleted.',
     'tag_deleted' => 'Tag deleted.',
+    'ends_before_start' => 'The :end cannot be earlier than the :start.',
+    'person_unavailable' => 'The selected person is not available.',
+    'tag_unavailable' => 'The selected tag does not exist.',
     'fields' => [
+        'ends_on' => 'end date',
         'starts_on' => 'start date',
         'due_on' => 'due date',
     ],

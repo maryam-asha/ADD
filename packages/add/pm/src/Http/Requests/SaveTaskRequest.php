@@ -50,6 +50,14 @@ class SaveTaskRequest extends FormRequest
     }
 
     /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return ['tag_ids.*.exists' => __('pm::pm.tag_unavailable')];
+    }
+
+    /**
      * @return list<\Closure>
      */
     public function after(): array

@@ -16,7 +16,7 @@ class PeopleTest extends TestCase
 {
     public function test_people_are_searched_by_name(): void
     {
-        $this->actingAsWith();
+        $this->actingAsWith(['pm.projects.manage']);
         $layla = User::query()->create(['name' => 'Layla Haddad', 'email' => 'l@example.test']);
         User::query()->create(['name' => 'Omar Aziz', 'email' => 'o@example.test']);
 
@@ -28,15 +28,22 @@ class PeopleTest extends TestCase
         );
     }
 
-    public function test_an_empty_search_lists_alphabetically_and_any_account_may_ask(): void
+    public function test_an_empty_search_lists_alphabetically(): void
     {
-        $this->actingAsWith();
+        $this->actingAsWith(['pm.projects.manage']);
         User::query()->create(['name' => 'Aaa First', 'email' => 'a@example.test']);
 
         $names = array_column($this->getJson('/api/pm/people')->assertOk()->json('data'), 'name');
 
         $this->assertSame('Aaa First', $names[0]);
         $this->assertSame($names, collect($names)->sort()->values()->all());
+    }
+
+    public function test_only_a_manager_of_projects_may_search_people(): void
+    {
+        $this->actingAsWith();
+
+        $this->getJson('/api/pm/people')->assertForbidden();
     }
 
     public function test_find_is_keyed_by_id_and_is_person_agrees(): void

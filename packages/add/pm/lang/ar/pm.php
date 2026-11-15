@@ -12,7 +12,11 @@ return [
     'project_archived' => 'هذا المشروع مؤرشف، لذا لم يعد بالإمكان تعديل مهامه.',
     'task_deleted' => 'تم حذف المهمة.',
     'tag_deleted' => 'تم حذف الوسم.',
+    'ends_before_start' => ':end لا يمكن أن يسبق :start.',
+    'person_unavailable' => 'الشخص المحدد غير متاح.',
+    'tag_unavailable' => 'الوسم المحدد غير موجود.',
     'fields' => [
+        'ends_on' => 'تاريخ الانتهاء',
         'starts_on' => 'تاريخ البدء',
         'due_on' => 'تاريخ الاستحقاق',
     ],

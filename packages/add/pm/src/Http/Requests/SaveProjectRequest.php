@@ -41,7 +41,7 @@ class SaveProjectRequest extends FormRequest
             'members' => [$editing ? 'prohibited' : 'sometimes', 'array'],
             'members.*' => ['integer', 'distinct', function (string $attribute, mixed $value, \Closure $fail) {
                 if (! app(PeopleDirectory::class)->isPerson((int) $value)) {
-                    $fail(__('validation.exists', ['attribute' => $attribute]));
+                    $fail(__('pm::pm.person_unavailable'));
                 }
             }],
         ];
@@ -65,7 +65,10 @@ class SaveProjectRequest extends FormRequest
             $start = $this->input('starts_on', $existing?->starts_on?->format('Y-m-d'));
             $end = $this->input('ends_on', $existing?->ends_on?->format('Y-m-d'));
             if ($start !== null && $end !== null && $end < $start) {
-                $validator->errors()->add('ends_on', __('validation.after_or_equal', ['attribute' => 'ends on', 'date' => 'starts on']));
+                $validator->errors()->add('ends_on', __('pm::pm.ends_before_start', [
+                    'end' => __('pm::pm.fields.ends_on'),
+                    'start' => __('pm::pm.fields.starts_on'),
+                ]));
             }
 
             $lead = $this->input('lead_user_id');

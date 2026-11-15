@@ -25,7 +25,7 @@ class ReplaceMembersRequest extends FormRequest
             'members' => ['present', 'array'],
             'members.*' => ['integer', 'distinct', function (string $attribute, mixed $value, \Closure $fail) {
                 if (! app(PeopleDirectory::class)->isPerson((int) $value)) {
-                    $fail(__('validation.exists', ['attribute' => $attribute]));
+                    $fail(__('pm::pm.person_unavailable'));
                 }
             }],
         ];
