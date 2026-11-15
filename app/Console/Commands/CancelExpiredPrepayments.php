@@ -7,15 +7,10 @@ use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Services\BookingCancellationService;
 use App\Domain\Booking\Services\BookingNotifier;
 use App\Domain\Ecosystem\Models\EventAttendee;
-use App\Domain\Finance\Enums\PaymentStatus;
-use App\Domain\Finance\Exceptions\PaymeraException;
-use App\Domain\Finance\Models\Payment;
-use App\Domain\Finance\Payments\PaymentMethodRegistry;
-use App\Domain\Finance\Services\SyncPaymentStatus;
+use App\Domain\Finance\Payments\LastWordFromTheGateway;
 use App\Services\Experience\EventNotifier;
 use App\Support\Enums\EventRegistrationStatus;
 use Illuminate\Console\Command;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -35,8 +30,7 @@ class CancelExpiredPrepayments extends Command
     protected $description = 'Cancel bookings and registrations whose prepayment was not completed in time.';
 
     public function handle(
-        SyncPaymentStatus $sync,
-        PaymentMethodRegistry $methods,
+        LastWordFromTheGateway $gateway,
         BookingCancellationService $cancellations,
         BookingNotifier $bookingNotices,
         EventNotifier $eventNotices,
@@ -47,10 +41,10 @@ class CancelExpiredPrepayments extends Command
         Booking::query()
             ->where('status', BookingStatus::AwaitingPayment)
             ->where('payment_due_at', '<=', now())
-            ->chunkById(100, function ($holds) use ($sync, $methods, $cancellations, $bookingNotices, &$cancelled) {
+            ->chunkById(100, function ($holds) use ($gateway, $cancellations, $bookingNotices, &$cancelled) {
                 foreach ($holds as $hold) {
                     try {
-                        $this->lastWordFromTheGateway($sync, $methods, $hold);
+                        $gateway->ask($hold);
 
                         if ($cancellations->releaseUnpaidHold($hold)) {
                             $cancelled++;
@@ -65,10 +59,10 @@ class CancelExpiredPrepayments extends Command
         EventAttendee::query()
             ->where('status', EventRegistrationStatus::AwaitingPayment)
             ->where('payment_due_at', '<=', now())
-            ->chunkById(100, function ($holds) use ($sync, $methods, $eventNotices, &$rejected) {
+            ->chunkById(100, function ($holds) use ($gateway, $eventNotices, &$rejected) {
                 foreach ($holds as $hold) {
                     try {
-                        $this->lastWordFromTheGateway($sync, $methods, $hold);
+                        $gateway->ask($hold);
 
                         if ($this->rejectRegistration($hold)) {
                             $rejected++;
@@ -85,28 +79,6 @@ class CancelExpiredPrepayments extends Command
         }
 
         return self::SUCCESS;
-    }
-
-    /**
-     * Any card still pending for it is asked once more; an accepted one
-     * pays it and releases the hold through the fulfiller. A gateway that
-     * cannot be reached decides nothing: the hold is judged on what is known.
-     */
-    private function lastWordFromTheGateway(SyncPaymentStatus $sync, PaymentMethodRegistry $methods, Model $hold): void
-    {
-        Payment::query()
-            ->forPayable($hold)
-            ->where('status', PaymentStatus::Pending)
-            ->whereIn('method', $methods->gatewayKeys())
-            ->get()
-            ->each(function (Payment $payment) use ($sync) {
-                try {
-                    $sync->handle($payment);
-                } catch (PaymeraException) {
-                    // Unreachable now; the reconciler keeps asking. A later
-                    // acceptance credits the member's wallet (needs_review).
-                }
-            });
     }
 
     private function rejectRegistration(EventAttendee $hold): bool

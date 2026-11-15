@@ -302,6 +302,75 @@ class KitchenOrderService
     }
 
     /**
+     * Cancel an order nobody acted on in time (decisions 3, 5 and 7), and
+     * give back what it took. `$why` names the wait it was stuck in:
+     * `payment` (held for its card, past `payment_due_at`), `reception`
+     * (past kitchen.reception_window_minutes, measured from when it was paid
+     * or else sent) or `kitchen` (pending past kitchen.accept_window_minutes
+     * from reaching the kitchen - an order on a bill too).
+     *
+     * Lock order as everywhere here: the bill, then the order, then its
+     * payment. The order is re-read under the lock: one a decision reached
+     * first, or whose deadline moved, is left alone and false is returned.
+     * The open card of a held order is cancelled at its gateway after the
+     * commit, never inside the transaction; the caller has already asked the
+     * gateway for its last word (LastWordFromTheGateway).
+     *
+     * @param  'payment'|'reception'|'kitchen'  $why
+     * @return bool whether this call cancelled it
+     */
+    public function expire(KitchenOrder $order, string $why): bool
+    {
+        $openCards = [];
+        $expired = false;
+
+        DB::transaction(function () use ($order, $why, &$openCards, &$expired) {
+            $this->lockedBill($order);
+
+            $locked = KitchenOrder::query()->whereKey($order->getKey())->lockForUpdate()->first();
+
+            if ($locked === null || ! $this->stuck($locked, $why)) {
+                return;
+            }
+
+            if ($locked->status === KitchenOrderStatus::AwaitingPayment) {
+                $openCards = $this->openCardPayments($locked->user, $locked->id);
+            }
+
+            $locked->update([
+                'status' => KitchenOrderStatus::Cancelled,
+                'cancelled_by' => CancelledBy::System,
+                'cancelled_at' => now(),
+            ]);
+
+            $this->refunder->refund($locked, __('api.kitchen.refund_description', ['order' => '#'.$locked->id]));
+            $this->notifier->expired($locked, $why);
+
+            $expired = true;
+        });
+
+        $this->cancelOpenCards($openCards);
+
+        return $expired;
+    }
+
+    /** Whether the order is still in the wait `$why` names, and past its deadline. */
+    private function stuck(KitchenOrder $order, string $why): bool
+    {
+        return match ($why) {
+            'payment' => $order->status === KitchenOrderStatus::AwaitingPayment
+                && $order->payment_due_at !== null
+                && $order->payment_due_at->lte(now()),
+            'reception' => $order->status === KitchenOrderStatus::AwaitingReception
+                && ($order->paid_at ?? $order->created_at)->lte(now()->subMinutes((int) config('kitchen.reception_window_minutes'))),
+            'kitchen' => $order->status === KitchenOrderStatus::Pending
+                && $order->reached_kitchen_at !== null
+                && $order->reached_kitchen_at->lte(now()->subMinutes((int) config('kitchen.accept_window_minutes'))),
+            default => false,
+        };
+    }
+
+    /**
      * The kitchen takes the order on (spec "accept"): in one transaction,
      * lock the bill and then the order, check the order is still pending
      * and the bill still open, and draw every line from the kitchen store it

@@ -565,6 +565,18 @@ return [
             'title' => 'Your order was cancelled',
             'body' => 'Order :order was cancelled because your session or booking ended before the kitchen accepted it.',
         ],
+        'expired_payment' => [
+            'title' => 'Your order was cancelled',
+            'body' => 'Order :order was cancelled because its card payment was not completed in time.',
+        ],
+        'expired_reception' => [
+            'title' => 'Your order was cancelled',
+            'body' => 'Order :order was cancelled because reception did not confirm it in time. Anything you paid is being given back.',
+        ],
+        'expired_kitchen' => [
+            'title' => 'Your order was cancelled',
+            'body' => 'Order :order was cancelled because the kitchen did not accept it in time. Anything you paid is being given back.',
+        ],
         'refunded' => [
             'title' => 'Your order was refunded',
             'body' => 'Order :order was not made. :points points were returned to your wallet.',

@@ -124,6 +124,25 @@ class KitchenOrderNotifier
     }
 
     /**
+     * Nobody acted on the order in time and the system cancelled it
+     * (`$why`: `payment` - its card never went through; `reception` - the
+     * desk never answered; `kitchen` - the kitchen never accepted). The board
+     * and the member's app are told, the desk's queue drops the row when it
+     * was waiting there, and the member is told why; what they get back is
+     * announced by refunded() / cashToCollect() as for any refund.
+     */
+    public function expired(KitchenOrder $order, string $why): void
+    {
+        $this->realtime->send(
+            new KitchenOrderChanged($order),
+            new MemberKitchenOrderUpdated($order),
+            ...($why === 'reception' ? [new KitchenOrderAwaitingReception($order)] : []),
+        );
+
+        $this->tellMember($order, 'kitchen_order.expired_'.$why);
+    }
+
+    /**
      * An order that was not made gave its points back: the member is told how
      * many, and whether to their own wallet or to the company's that paid.
      */

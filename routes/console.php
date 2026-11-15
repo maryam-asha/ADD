@@ -167,6 +167,16 @@ Schedule::command('renewals:run')->hourly()->withoutOverlapping();
 Schedule::command('notifications:send-reminders')->everyFiveMinutes()->withoutOverlapping();
 
 /*
+ * Kitchen orders nobody acts on (docs/superpowers/specs/2026-11-14-kitchen-
+ * orders-without-a-bill-design.md, N3 and N7): held for a card past its
+ * deadline, unconfirmed by reception, or unaccepted by the kitchen - a bill
+ * order too - are cancelled by the system and refunded. Every minute, the
+ * windows being minutes; each order is locked and re-read, so a decision
+ * landing in the same instant wins.
+ */
+Schedule::command('kitchen:expire-stale-orders')->everyMinute()->withoutOverlapping();
+
+/*
  * HR (packages/add/hr): each enabled module's daily jobs — refreshing
  * employee statuses and revoking access once a termination's last day has
  * passed, and the HR alerts digest. The package lists them itself
