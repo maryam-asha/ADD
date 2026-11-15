@@ -2,8 +2,10 @@
 
 namespace Tests\Feature\Kitchen;
 
+use App\Domain\Finance\Enums\CashRegisterSessionStatus;
 use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Finance\Enums\PaymentPurpose;
+use App\Domain\Finance\Models\CashRegisterSession;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Foundation\Models\Branch;
@@ -48,7 +50,7 @@ class CashReturnsTest extends TestCase
         $this->member = User::factory()->create();
         $this->member->assignRole('member');
 
-        Role::create(['name' => 'desk', 'guard_name' => 'web'])->givePermissionTo(['kitchen-orders.review', 'dashboard.finance']);
+        Role::create(['name' => 'desk', 'guard_name' => 'web'])->givePermissionTo(['kitchen-orders.review', 'dashboard.finance', 'payments.view', 'cash-register.manage']);
         $this->staff = User::factory()->create();
         $this->staff->assignRole('desk');
         Sanctum::actingAs($this->staff, ['*']);
@@ -164,5 +166,80 @@ class CashReturnsTest extends TestCase
 
         // The cash handed back is gone; the cash kept and the cash turned into points still count.
         $this->assertEqualsWithDelta($each * 2, array_sum(array_map(fn (array $row) => (float) $row['amount'], $cash)), 0.001);
+    }
+
+    /** The desk's open shift for `$operator`, opened before any cash in these tests was taken. */
+    private function shift(User $operator): CashRegisterSession
+    {
+        return CashRegisterSession::create([
+            'user_id' => $operator->id,
+            'branch_id' => $this->branch->id,
+            'opened_at' => now()->subHour(),
+            'opening_balance' => '100',
+            'status' => CashRegisterSessionStatus::Open,
+        ]);
+    }
+
+    private function expectedAtClose(User $operator, CashRegisterSession $session): string
+    {
+        Sanctum::actingAs($operator, ['*']);
+
+        return $this->postJson("/api/v1/admin/reception/cash-register-sessions/{$session->id}/close", ['closing_balance' => '0.00'])
+            ->assertOk()
+            ->json('data.expected_balance');
+    }
+
+    public function test_a_shift_that_took_and_handed_back_the_cash_expects_its_opening_balance(): void
+    {
+        $session = $this->shift($this->staff);
+        $order = $this->owed();
+        $this->postJson("/api/v1/admin/reception/kitchen-cash-returns/{$order->id}/returned")->assertOk();
+
+        $this->assertSame('100', $this->expectedAtClose($this->staff, $session));
+    }
+
+    public function test_a_hand_back_by_another_operator_does_not_touch_this_shift(): void
+    {
+        $session = $this->shift($this->staff);
+        $order = $this->owed();
+        $other = User::factory()->create();
+        $other->assignRole('desk');
+        Sanctum::actingAs($other, ['*']);
+        $this->postJson("/api/v1/admin/reception/kitchen-cash-returns/{$order->id}/returned")->assertOk();
+
+        $taken = (string) Payment::query()->forPayable($order)->sole()->received_amount;
+        $this->assertEqualsWithDelta(100 + (float) $taken, (float) $this->expectedAtClose($this->staff, $session), 0.001);
+    }
+
+    public function test_a_credit_as_points_does_not_reduce_the_drawer(): void
+    {
+        $session = $this->shift($this->staff);
+        $order = $this->owed();
+        $this->postJson("/api/v1/admin/reception/kitchen-cash-returns/{$order->id}/credit-points")->assertOk();
+
+        $taken = (string) Payment::query()->forPayable($order)->sole()->received_amount;
+        $this->assertEqualsWithDelta(100 + (float) $taken, (float) $this->expectedAtClose($this->staff, $session), 0.001);
+    }
+
+    public function test_the_payments_screen_leaves_handed_back_cash_out_and_says_who_returned_it(): void
+    {
+        $kept = $this->owed();
+        $returned = $this->owed();
+        $credited = $this->owed();
+        $each = (float) Payment::query()->forPayable($kept)->sole()->received_amount;
+        $this->postJson("/api/v1/admin/reception/kitchen-cash-returns/{$returned->id}/returned")->assertOk();
+        $this->postJson("/api/v1/admin/reception/kitchen-cash-returns/{$credited->id}/credit-points")->assertOk();
+
+        $cash = $this->getJson('/api/v1/admin/payments/summary')->assertOk()->json('data.cash');
+        $this->assertEqualsWithDelta($each * 2, array_sum(array_map(fn (array $row) => (float) $row['amount'], $cash)), 0.001);
+
+        $handed = Payment::query()->forPayable($returned)->sole();
+        $this->getJson("/api/v1/admin/payments/{$handed->id}")->assertOk()
+            ->assertJsonPath('data.refunded_in_cash', true)
+            ->assertJsonPath('data.refunded_by', $this->staff->id);
+        $points = Payment::query()->forPayable($credited)->sole();
+        $this->getJson("/api/v1/admin/payments/{$points->id}")->assertOk()
+            ->assertJsonPath('data.refunded_in_cash', false)
+            ->assertJsonPath('data.refunded_by', null);
     }
 }

@@ -357,8 +357,9 @@ class PaymentService
      * Cash taken at reception for something that did not go ahead is handed
      * back across the desk. The cash became points and was spent in the same
      * breath, so nothing moves in the wallet: the payment is only marked
-     * refunded, with no refund transaction — which is how the books tell
-     * cash handed back from cash credited as points. Idempotent callers
+     * refunded by `$operator`, with no refund transaction — which is how the
+     * books tell cash handed back from cash credited as points, and how that
+     * operator's shift subtracts it (CashRegisterService::closeSession). Idempotent callers
      * lock their record first, then this locks the payment.
      *
      * @throws ReceptionActionException 409 api.payment.not_refundable unless an accepted, cash, not yet refunded payment
@@ -377,6 +378,7 @@ class PaymentService
             $payment->forceFill([
                 'refunded_at' => now(),
                 'refund_transaction_id' => null,
+                'refunded_by' => $operator->id,
             ])->save();
         });
     }

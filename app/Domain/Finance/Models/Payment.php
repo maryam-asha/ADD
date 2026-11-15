@@ -71,6 +71,7 @@ class Payment extends Model
         'debit_transaction_id',
         'refund_transaction_id',
         'refunded_at',
+        'refunded_by',
         'collected_via',
         'received_amount',
         'received_currency',

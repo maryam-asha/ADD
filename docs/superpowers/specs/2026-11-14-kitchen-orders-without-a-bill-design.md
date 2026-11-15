@@ -112,6 +112,16 @@ automatically.
      (`FinanceOverview`), so returned cash must leave that count.*)* *Why:* someone paying cash is
      often not a regular member, and points may be of no use to them. *Given
      up:* the single refund path through `PaymentService::refund`.
+     - *Correction 2026-11-15:* the "no cash-drawer record" note above was
+       wrong. `CashRegisterService::closeSession` expects the drawer to hold
+       the opening balance plus the operator's cash wallet credits in the
+       shift, so a hand-back would leave that shift short. Hand-backs now
+       reconcile: `payments.refunded_by` records who handed it back, and the
+       close subtracts the cash that operator handed back during the shift
+       (`refund_transaction_id` null), in base currency at the rate stored on
+       the original cash credit. Cash credited as points leaves the drawer
+       alone. The payments screen and the finance dashboard both leave
+       handed-back cash out of the cash total.
      - *(My call:)* if the member asks for points instead, reception may credit
        the order as points (`PaymentService::refund`) from the same list. An
        unclaimed amount stays on the list. Nothing expires it.

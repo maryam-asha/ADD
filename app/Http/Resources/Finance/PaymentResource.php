@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Finance;
 
+use App\Domain\Finance\Enums\PaymentMethod;
 use App\Http\Resources\Concerns\PreloadsAppliedDiscounts;
 use App\Support\Presenters\AppliedDiscountPresenter;
 use Illuminate\Http\Request;
@@ -97,6 +98,9 @@ class PaymentResource extends JsonResource
                 'reversed_at' => $this->reversed_at?->toISOString(),
                 'reversed_by' => $this->reversed_by,
                 'refunded_at' => $this->refunded_at?->toISOString(),
+                // Cash handed back across the desk (no points credited), and by whom.
+                'refunded_in_cash' => $this->refunded_at !== null && $this->refund_transaction_id === null && $this->collected_via === PaymentMethod::Cash,
+                'refunded_by' => $this->refunded_by,
 
                 // Cash taken at the desk: in what, how much, by whom.
                 'collected_via' => $this->collected_via?->value,

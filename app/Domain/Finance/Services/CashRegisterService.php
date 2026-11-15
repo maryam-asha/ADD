@@ -5,6 +5,7 @@ namespace App\Domain\Finance\Services;
 use App\Domain\Finance\Enums\CashRegisterSessionStatus;
 use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Finance\Models\CashRegisterSession;
+use App\Domain\Finance\Models\Payment;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Models\WalletTransaction;
 use Illuminate\Validation\ValidationException;
@@ -67,6 +68,25 @@ class CashRegisterService
 
                 return bcadd($carry, $inBase, 8);
             }, '0');
+
+        // Less the cash this operator handed back during the shift for orders
+        // that were not made (PaymentService::markReturnedInCash), in base
+        // currency at the rate the cash was taken at — read from the credit
+        // that cash became (`wallet_transaction_id`).
+        $returned = Payment::query()
+            ->where('refunded_by', $session->user_id)
+            ->whereNull('refund_transaction_id')
+            ->where('collected_via', PaymentMethod::Cash->value)
+            ->whereNotNull('received_amount')
+            ->whereBetween('refunded_at', [$session->opened_at, $now])
+            ->get();
+        $credits = WalletTransaction::query()->whereIn('id', $returned->pluck('wallet_transaction_id')->filter())->get()->keyBy('id');
+
+        foreach ($returned as $payment) {
+            $rate = $credits->get($payment->wallet_transaction_id)?->exchange_rate_to_base;
+            $money = (string) $payment->received_amount;
+            $cashCollected = bcsub($cashCollected, $rate === null ? $money : bcmul($money, (string) $rate, 8), 8);
+        }
 
         $cashCollected = bcadd($cashCollected, '0', 2);
 

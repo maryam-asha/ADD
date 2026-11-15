@@ -92,6 +92,8 @@ class PaymentController extends Controller
         $cash = $this->filtered($validated)
             ->where('status', $accepted)
             ->whereNotNull('received_amount')
+            // Cash handed back across the desk is not cash received; cash credited as points was kept.
+            ->where(fn ($query) => $query->whereNull('refunded_at')->orWhereNotNull('refund_transaction_id'))
             ->selectRaw('received_currency as currency, SUM(received_amount) as amount')
             ->groupBy('received_currency')
             ->toBase()
