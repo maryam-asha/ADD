@@ -386,6 +386,46 @@ class PayingWhenSendingTest extends TestCase
         $this->assertSame(60, $this->balance($wallet));
     }
 
+    /**
+     * The old card could not be canceled (the gateway refused) and the bank
+     * accepts it after the order was paid from the wallet: the order is not
+     * paid twice — settling re-checks it, finds it paid, and the card's
+     * points stay in the member's wallet with the payment under review.
+     */
+    public function test_an_old_card_accepted_after_a_wallet_switch_pays_nothing_twice(): void
+    {
+        $this->officeStaff();
+        $wallet = $this->personalWallet(100);
+        Http::fake([
+            '*/api/create-payment' => Http::response(['ErrorMessage' => 'Success', 'ErrorCode' => 0, 'Data' => ['url' => 'https://egate-t.paymera.test/start/pay-1/en', 'paymentId' => 'pay-1']]),
+            '*/api/cancel-payment' => Http::response('', 500),
+        ]);
+
+        $id = $this->send(['method' => 'card'])->assertCreated()->json('data.id');
+        $card = Payment::query()->where('payment_id', 'pay-1')->sole();
+        $before = $this->balance($wallet);
+
+        $this->send(['method' => 'wallet'], ['order_id' => $id])->assertOk()->assertJsonPath('data.paid', true);
+        $this->assertSame(PaymentStatus::Pending, $card->refresh()->status);
+        $paidAt = KitchenOrder::query()->findOrFail($id)->paid_at;
+
+        // The bank's answer for the old card arrives: accepted.
+        $card->forceFill(['status' => PaymentStatus::Accepted])->save();
+        app(PaymentService::class)->fulfilAcceptedGatewayPayment($card->refresh());
+
+        $order = KitchenOrder::query()->findOrFail($id);
+        $this->assertSame(KitchenOrderStatus::Pending, $order->status);
+        $this->assertEquals($paidAt, $order->paid_at);
+        $accepted = Payment::query()->forPayable($order)->where('status', PaymentStatus::Accepted)->get();
+        $this->assertCount(1, $accepted);
+        $this->assertSame('wallet', $accepted->sole()->method);
+
+        $this->assertSame(PaymentStatus::NeedsReview, $card->refresh()->status);
+        $this->assertNull($card->debit_transaction_id);
+        $this->assertSame($before - 40 + (int) $card->points_to_credit, $this->balance($wallet));
+        $this->assertSame(40, (int) $card->points_to_credit);
+    }
+
     public function test_held_order_switched_to_cash_goes_to_reception(): void
     {
         $this->personalWallet();
