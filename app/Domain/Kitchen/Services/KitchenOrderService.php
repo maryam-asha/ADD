@@ -65,6 +65,7 @@ class KitchenOrderService
         private readonly OrderRouting $routing,
         private readonly PaymentService $payments,
         private readonly PaymentMethodRegistry $methods,
+        private readonly KitchenOrderRefunder $refunder,
     ) {}
 
     /**
@@ -258,18 +259,27 @@ class KitchenOrderService
     }
 
     /**
-     * Take back an order the kitchen has not accepted. Locked, so an accept
-     * landing at the same moment either wins or sees it cancelled.
+     * Take back an order the kitchen has not accepted (held for its card,
+     * waiting for reception, or pending) and get back what it took. Locked,
+     * so an accept landing at the same moment either wins or sees it
+     * cancelled. A held card order's open gateway payment is cancelled once
+     * the transaction has committed.
      *
      * @throws KitchenOrderException the order is past pending (409)
      */
     public function cancelByMember(KitchenOrder $order): void
     {
-        DB::transaction(function () use ($order) {
-            $locked = KitchenOrder::query()->whereKey($order->getKey())->lockForUpdate()->firstOrFail();
+        $openCards = [];
 
-            if ($locked->status !== KitchenOrderStatus::Pending) {
-                throw new KitchenOrderException('api.kitchen.order_not_pending', 409);
+        DB::transaction(function () use ($order, &$openCards) {
+            $locked = $this->locked($order, [
+                KitchenOrderStatus::AwaitingPayment,
+                KitchenOrderStatus::AwaitingReception,
+                KitchenOrderStatus::Pending,
+            ], 'api.kitchen.order_not_pending');
+
+            if ($locked->status === KitchenOrderStatus::AwaitingPayment) {
+                $openCards = $this->openCardPayments($locked->user, $locked->id);
             }
 
             $locked->update([
@@ -278,8 +288,11 @@ class KitchenOrderService
                 'cancelled_at' => now(),
             ]);
 
+            $this->refunder->refund($locked, __('api.kitchen.refund_description', ['order' => '#'.$locked->id]));
             $this->notifier->cancelledByMember($locked);
         });
+
+        $this->cancelOpenCards($openCards);
 
         $order->refresh();
     }
@@ -333,43 +346,67 @@ class KitchenOrderService
     }
 
     /**
-     * A bill closing takes its unaccepted orders with it: every pending order
-     * on it is cancelled by the system. Called with the bill's row already
-     * locked (lock order: bill, then order). Orders the kitchen accepted stay.
+     * A bill closing takes its unaccepted orders with it: every order on it
+     * still held for its card, waiting for reception or pending is cancelled
+     * by the system, and what it took is given back (KitchenOrderRefunder).
+     * Called with the bill's row already locked (lock order: bill, order,
+     * payment). Orders the kitchen accepted stay.
      *
      * Each order cancelled is announced to the kitchen board and its member
-     * is told, once the surrounding transaction commits.
+     * is told, once the surrounding transaction commits. The open card of a
+     * held order is cancelled at its gateway at that same point, never inside
+     * the transaction.
      *
      * @return Collection<int, KitchenOrder> the orders it cancelled
      */
     public function cancelPendingFor(Booking|WalkinSession $bill): Collection
     {
-        $ids = KitchenOrder::query()
+        $orders = KitchenOrder::query()
             ->where('billable_type', $bill->getMorphClass())
             ->where('billable_id', $bill->getKey())
-            ->where('status', KitchenOrderStatus::Pending)
+            ->whereIn('status', [
+                KitchenOrderStatus::AwaitingPayment,
+                KitchenOrderStatus::AwaitingReception,
+                KitchenOrderStatus::Pending,
+            ])
             ->lockForUpdate()
-            ->pluck('id');
+            ->get();
 
-        if ($ids->isEmpty()) {
+        if ($orders->isEmpty()) {
             return new Collection;
         }
 
-        KitchenOrder::query()->whereKey($ids)->update([
+        $openCards = [];
+
+        foreach ($orders as $order) {
+            if ($order->status === KitchenOrderStatus::AwaitingPayment) {
+                $openCards = [...$openCards, ...$this->openCardPayments($order->user, $order->id)];
+            }
+        }
+
+        KitchenOrder::query()->whereKey($orders->modelKeys())->update([
             'status' => KitchenOrderStatus::Cancelled,
             'cancelled_by' => CancelledBy::System,
             'cancelled_at' => now(),
         ]);
 
-        $cancelled = KitchenOrder::query()->with('user')->whereKey($ids)->get();
-        $cancelled->each(fn (KitchenOrder $order) => $this->notifier->cancelledBySystem($order));
+        $cancelled = KitchenOrder::query()->with('user')->whereKey($orders->modelKeys())->get();
+
+        foreach ($cancelled as $order) {
+            $this->refunder->refund($order, __('api.kitchen.refund_description', ['order' => '#'.$order->id]));
+            $this->notifier->cancelledBySystem($order);
+        }
+
+        if ($openCards !== []) {
+            DB::afterCommit(fn () => $this->cancelOpenCards($openCards));
+        }
 
         return $cancelled;
     }
 
     /**
      * The kitchen turns a pending order down; the member sees the reason.
-     * Nothing was drawn, so nothing is returned.
+     * No stock was drawn; what the member paid is given back.
      *
      * @throws KitchenOrderException not pending (409)
      */
@@ -384,6 +421,7 @@ class KitchenOrderService
                 'rejected_at' => now(),
             ]);
 
+            $this->refunder->refund($locked, __('api.kitchen.refund_description', ['order' => '#'.$locked->id]));
             $this->notifier->rejected($locked);
         });
 

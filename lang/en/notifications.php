@@ -565,6 +565,14 @@ return [
             'title' => 'Your order was cancelled',
             'body' => 'Order :order was cancelled because your session or booking ended before the kitchen accepted it.',
         ],
+        'refunded' => [
+            'title' => 'Your order was refunded',
+            'body' => 'Order :order was not made. :points points were returned to :wallet.',
+        ],
+        'cash_to_collect' => [
+            'title' => 'Your cash is waiting for you',
+            'body' => 'Order :order was not made. Please collect the cash you paid from reception.',
+        ],
         // Staff: whoever reviews kitchen orders (kitchen-orders.review).
         'awaiting_reception' => [
             'title' => 'A kitchen order to confirm',

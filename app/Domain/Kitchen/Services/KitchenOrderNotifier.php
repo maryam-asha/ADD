@@ -2,12 +2,15 @@
 
 namespace App\Domain\Kitchen\Services;
 
+use App\Domain\Finance\Models\Payment;
+use App\Domain\Identity\Models\Company;
 use App\Domain\Kitchen\Enums\DeliveryType;
 use App\Domain\Kitchen\Enums\KitchenOrderStatus;
 use App\Domain\Kitchen\Events\KitchenOrderAwaitingReception;
 use App\Domain\Kitchen\Events\KitchenOrderChanged;
 use App\Domain\Kitchen\Events\MemberKitchenOrderUpdated;
 use App\Domain\Kitchen\Models\KitchenOrder;
+use App\Domain\Membership\Enums\OwnerType;
 use App\Services\Notification\NotificationService;
 use App\Services\Realtime\RealtimeBroadcaster;
 
@@ -95,6 +98,48 @@ class KitchenOrderNotifier
     public function cancelledBySystem(KitchenOrder $order): void
     {
         $this->changed($order, 'kitchen_order.cancelled_by_system');
+    }
+
+    /**
+     * An order that was not made gave its points back: the member is told how
+     * many, and to which wallet: their own, or the company's that paid.
+     */
+    public function refunded(KitchenOrder $order, Payment $payment): void
+    {
+        $member = $order->user;
+
+        if ($member === null) {
+            return;
+        }
+
+        $wallet = $payment->wallet;
+        $name = $wallet?->owner_type === OwnerType::Company
+            ? (string) Company::query()->whereKey($wallet->owner_id)->value('legal_name')
+            : $member->name;
+
+        $this->notifications->sendToUser($member, 'kitchen_order.refunded', [
+            'order' => '#'.$order->id,
+            'points' => (int) $payment->amount_points,
+            'wallet' => $name,
+        ], [
+            'target_type' => 'kitchen_order',
+            'target_id' => (string) $order->id,
+        ]);
+    }
+
+    /** Cash paid for an order that was not made waits at reception. */
+    public function cashToCollect(KitchenOrder $order): void
+    {
+        $member = $order->user;
+
+        if ($member === null) {
+            return;
+        }
+
+        $this->notifications->sendToUser($member, 'kitchen_order.cash_to_collect', ['order' => '#'.$order->id], [
+            'target_type' => 'kitchen_order',
+            'target_id' => (string) $order->id,
+        ]);
     }
 
     /**

@@ -856,6 +856,7 @@ return [
         'delivery_required' => 'Choose to pick it up from the kitchen counter, or write where to bring it.',
         'space_not_in_branch' => 'That place is not in the branch of your session or booking.',
         'order_not_pending' => 'The kitchen has already handled this order.',
+        'refund_description' => 'Refund for kitchen order :order',
         'order_not_preparing' => 'Only an order being prepared can be marked ready.',
         'order_not_deliverable' => 'Only an order being prepared or ready can be marked delivered.',
         'bill_closed' => 'The session or booking this order is on has closed.',
