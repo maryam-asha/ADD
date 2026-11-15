@@ -28,10 +28,15 @@ use App\Domain\Foundation\Models\Floor;
 use App\Domain\Foundation\Models\SeatDesk;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Foundation\Models\Zone;
+use App\Domain\Identity\Enums\PrivateOfficeRequestStatus;
 use App\Domain\Identity\Models\Company;
+use App\Domain\Identity\Models\PrivateOfficeRequest;
 use App\Domain\Identity\Models\User;
 use App\Domain\Identity\Services\AccountCreationService;
 use App\Domain\Kitchen\Enums\QrPointPlace;
+use App\Domain\Leasing\Enums\OfficeLeaseStatus;
+use App\Domain\Leasing\Models\OfficeLease;
+use App\Domain\Providers\Enums\Payer;
 use App\Domain\Kitchen\Models\KitchenStore;
 use App\Domain\Kitchen\Models\QrPoint;
 use App\Domain\Membership\Models\ResourceType;
@@ -124,6 +129,7 @@ class InventoryDemoSeeder extends Seeder
                 $this->seedStock();
                 $this->seedSales();
                 $this->seedKitchen();
+                $this->seedKitchenMembers();
                 $this->seedAccounts();
             });
         } finally {
@@ -494,6 +500,55 @@ class InventoryDemoSeeder extends Seeder
                 ['branch_id' => $pointBranchId, 'qr_value' => Str::random(40)],
             );
         }
+    }
+
+    /**
+     * Two members to try ordering as: one on staff of a company whose office
+     * lease holds today and who has door access (orders go straight to the
+     * kitchen), and one with no session and no office (orders go through
+     * reception, where cash is taken).
+     */
+    private function seedKitchenMembers(): void
+    {
+        $accounts = app(AccountCreationService::class);
+        $branchId = $this->places['reception']->id;
+
+        $staff = User::query()->where('email', 'kitchen-office-staff@member.demo')->first()
+            ?? $accounts->create(['name' => 'موظف مكتب تجريبي', 'phone' => '+963944508201', 'email' => 'kitchen-office-staff@member.demo'], 'member', 'password');
+
+        if (User::query()->where('email', 'kitchen-no-session@member.demo')->doesntExist()) {
+            $accounts->create(['name' => 'عضو بلا جلسة تجريبي', 'phone' => '+963944508202', 'email' => 'kitchen-no-session@member.demo'], 'member', 'password');
+        }
+
+        $space = Space::query()->where('space_type', SpaceType::Business)->orderBy('id')->first();
+
+        if ($space === null || $staff->companies()->exists()) {
+            return;
+        }
+
+        $company = Company::query()->create(['legal_name' => 'شركة المطبخ التجريبية', 'contract_ref' => 'KITCHEN-DEMO', 'branch_id' => $branchId]);
+        $staff->companies()->attach($company->id, ['door_access_enabled' => true, 'is_admin' => true]);
+
+        $request = PrivateOfficeRequest::query()->create([
+            'prospect_name' => $company->legal_name,
+            'contact' => '+963944508201',
+            'status' => PrivateOfficeRequestStatus::Contracted,
+            'converted_company_id' => $company->id,
+        ]);
+        $starts = $this->today->subMonth();
+        OfficeLease::query()->create([
+            'company_id' => $company->id,
+            'space_id' => $space->id,
+            'private_office_request_id' => $request->id,
+            'billed_to' => Payer::Company,
+            'currency' => 'USD',
+            'monthly_amount' => '500.00',
+            'starts_on' => $starts->toDateString(),
+            'duration_months' => 12,
+            'billing_cycle_months' => 3,
+            'ends_on' => $starts->addMonthsNoOverflow(12)->subDay()->toDateString(),
+            'status' => OfficeLeaseStatus::Active,
+        ]);
     }
 
     // ── Accounts ────────────────────────────────────────────────────────────

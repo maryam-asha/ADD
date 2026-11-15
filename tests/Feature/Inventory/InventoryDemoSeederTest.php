@@ -16,6 +16,9 @@ use App\Domain\Kitchen\Models\QrPoint;
 use App\Domain\Kitchen\Services\KitchenMenu;
 use App\Domain\Membership\Models\ResourceType;
 use App\Domain\Retail\Models\SaleItem;
+use App\Domain\Kitchen\Enums\OrderRoute;
+use App\Domain\Kitchen\Services\OfficeStaff;
+use App\Domain\Kitchen\Services\OrderRouting;
 use Database\Seeders\CurrencySeeder;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\InventoryDemoSeeder;
@@ -91,5 +94,19 @@ class InventoryDemoSeederTest extends TestCase
             array_map(fn (array $line) => (int) $line['sale_item']->price_points, $menu),
         );
         $this->assertTrue(QrPoint::query()->where('place_type', 'seat_desk')->exists());
+    }
+
+    public function test_demo_has_an_office_staff_member_and_one_with_no_session(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $this->seed(InventoryDemoSeeder::class);
+
+        $branchId = (int) Branch::query()->value('id');
+        $staff = User::query()->where('email', 'kitchen-office-staff@member.demo')->firstOrFail();
+        $plain = User::query()->where('email', 'kitchen-no-session@member.demo')->firstOrFail();
+
+        $this->assertNotNull(app(OfficeStaff::class)->leaseFor($staff, $branchId));
+        $this->assertSame(OrderRoute::Kitchen, app(OrderRouting::class)->for($staff, null, $branchId)->route);
+        $this->assertSame(OrderRoute::Reception, app(OrderRouting::class)->for($plain, null, $branchId)->route);
     }
 }

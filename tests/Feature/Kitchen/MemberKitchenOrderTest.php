@@ -18,6 +18,10 @@ use App\Domain\Kitchen\Models\KitchenOrder;
 use App\Domain\Kitchen\Models\KitchenStore;
 use App\Domain\Kitchen\Models\QrPoint;
 use App\Domain\Retail\Models\SaleItem;
+use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Membership\Enums\WalletTransactionSource;
+use App\Domain\Membership\Models\Wallet;
+use App\Domain\Membership\Services\WalletService;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -331,11 +335,27 @@ class MemberKitchenOrderTest extends TestCase
         $this->send(1, ['delivery' => ['type' => 'pickup'], 'payment' => ['method' => 'cash']])
             ->assertCreated()
             ->assertJsonPath('data.status', 'awaiting_reception')
-            ->assertJsonPath('data.bill.id', null);
+            ->assertJsonPath('data.bill', null);
 
         $order = KitchenOrder::query()->sole();
         $this->assertNull($order->billable_type);
         $this->assertSame($this->branch->id, $order->branch_id);
+    }
+
+    public function test_member_order_resource_shows_route_and_payment(): void
+    {
+        $wallet = Wallet::query()->firstOrCreate(['owner_type' => OwnerType::User, 'owner_id' => $this->member->id]);
+        app(WalletService::class)->creditGeneral($wallet, 100, WalletTransactionSource::TopUp);
+
+        $this->send(2, ['delivery' => ['type' => 'pickup'], 'payment' => ['method' => 'wallet']])
+            ->assertCreated()
+            ->assertJsonPath('data.bill', null)
+            ->assertJsonPath('data.route', 'reception')
+            ->assertJsonPath('data.payment.choice', 'wallet')
+            ->assertJsonPath('data.payment.paid', true)
+            ->assertJsonPath('data.payment.refunded', false)
+            ->assertJsonPath('data.payment.cash_return', null)
+            ->assertJsonPath('data.payment_due_at', null);
     }
 
     public function test_member_cancels_a_pending_order(): void
