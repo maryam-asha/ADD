@@ -3,13 +3,14 @@
 namespace App\Http\Controllers\Api\V1\Admin\Reception;
 
 use App\Domain\Booking\Exceptions\ReceptionActionException;
+use App\Domain\Finance\Exceptions\PaymentPricingException;
 use App\Domain\Kitchen\Enums\KitchenOrderStatus;
 use App\Domain\Kitchen\Exceptions\KitchenOrderException;
 use App\Domain\Kitchen\Models\KitchenOrder;
 use App\Domain\Kitchen\Services\ReceptionOrderReview;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\RejectKitchenOrderRequest;
 use App\Http\Requests\Admin\Reception\AcceptKitchenOrderRequest;
-use App\Http\Requests\Admin\Reception\RejectReceptionKitchenOrderRequest;
 use App\Http\Resources\Kitchen\AdminKitchenOrderResource;
 use Closure;
 use Illuminate\Http\JsonResponse;
@@ -23,7 +24,7 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
  */
 class KitchenOrderReviewController extends Controller
 {
-    private const RELATIONS = ['user', 'lines.item', 'seatDesk', 'space'];
+    private const RELATIONS = ['user', 'lines.item', 'seatDesk', 'space', 'acceptedPayment.wallet'];
 
     /** GET admin/reception/kitchen-orders — `branch_id` narrows it; the orders awaiting reception only, oldest first. */
     public function index(Request $request): AnonymousResourceCollection
@@ -56,7 +57,7 @@ class KitchenOrderReviewController extends Controller
     }
 
     /** POST admin/reception/kitchen-orders/{order}/reject `{reason}` */
-    public function reject(RejectReceptionKitchenOrderRequest $request, KitchenOrder $order, ReceptionOrderReview $review): AdminKitchenOrderResource|JsonResponse
+    public function reject(RejectKitchenOrderRequest $request, KitchenOrder $order, ReceptionOrderReview $review): AdminKitchenOrderResource|JsonResponse
     {
         return $this->act(fn () => $review->reject($order, $request->user(), $request->validated('reason')));
     }
@@ -75,6 +76,10 @@ class KitchenOrderReviewController extends Controller
             }
 
             return response()->json($body, $e->status);
+        } catch (PaymentPricingException) {
+            // A currency with no rate yet: the desk's to fix, not a gateway
+            // outage. Nothing was written; the order is still in the queue.
+            return response()->json(['message' => __('api.payment.currency_unavailable')], 422);
         }
 
         return new AdminKitchenOrderResource($order->load(self::RELATIONS));

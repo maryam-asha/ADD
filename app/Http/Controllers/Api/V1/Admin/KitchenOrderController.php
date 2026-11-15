@@ -23,7 +23,7 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
  */
 class KitchenOrderController extends Controller
 {
-    private const RELATIONS = ['user', 'lines.item', 'seatDesk', 'space'];
+    private const RELATIONS = ['user', 'lines.item', 'seatDesk', 'space', 'acceptedPayment.wallet'];
 
     /**
      * GET admin/kitchen/orders — filters `branch_id`, `status` (comma

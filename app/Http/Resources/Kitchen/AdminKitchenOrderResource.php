@@ -2,8 +2,6 @@
 
 namespace App\Http\Resources\Kitchen;
 
-use App\Domain\Finance\Enums\PaymentStatus;
-use App\Domain\Finance\Models\Payment;
 use App\Domain\Kitchen\Enums\OrderPaymentChoice;
 use App\Domain\Kitchen\Models\KitchenOrder;
 use Illuminate\Http\Request;
@@ -27,7 +25,7 @@ class AdminKitchenOrderResource extends KitchenOrderResource
      */
     public function toArray(Request $request): array
     {
-        $this->loadMissing('user');
+        $this->loadMissing('user', 'acceptedPayment.wallet');
 
         $until = $this->delivered_at ?? $this->rejected_at ?? $this->cancelled_at ?? now();
 
@@ -53,13 +51,6 @@ class AdminKitchenOrderResource extends KitchenOrderResource
     /** Whose wallet paid the order — from its accepted payment; null when none has. */
     private function walletOwnerType(): ?string
     {
-        $payment = Payment::query()
-            ->forPayable($this->resource)
-            ->where('status', PaymentStatus::Accepted)
-            ->with('wallet')
-            ->latest('id')
-            ->first();
-
-        return $payment?->wallet?->owner_type->value;
+        return $this->acceptedPayment?->wallet?->owner_type->value;
     }
 }

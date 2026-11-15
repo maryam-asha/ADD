@@ -24,10 +24,12 @@ use App\Notifications\GeneralNotification;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\SettingSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
+use Spatie\Activitylog\Models\Activity;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -224,7 +226,7 @@ class ReceptionReviewTest extends TestCase
         $order = $this->waiting();
 
         $this->act($order, 'reject')->assertUnprocessable()->assertJsonValidationErrors('reason');
-        $this->act($order, 'reject', ['reason' => str_repeat('a', 201)])->assertUnprocessable()->assertJsonValidationErrors('reason');
+        $this->act($order, 'reject', ['reason' => str_repeat('a', 301)])->assertUnprocessable()->assertJsonValidationErrors('reason');
         $this->assertSame(KitchenOrderStatus::AwaitingReception, $order->refresh()->status);
     }
 
@@ -251,5 +253,94 @@ class ReceptionReviewTest extends TestCase
         $this->act($order, 'accept')->assertForbidden();
         $this->act($order, 'reject', ['reason' => 'No'])->assertForbidden();
         $this->assertSame(KitchenOrderStatus::AwaitingReception, $order->refresh()->status);
+    }
+
+    public function test_taking_cash_is_logged_as_the_desk_logs_cash_and_a_paid_order_logs_nothing(): void
+    {
+        $order = $this->waiting();
+        $paid = $this->waiting(['paid_at' => now()]);
+
+        $this->act($paid, 'accept')->assertOk();
+        $this->assertSame(0, Activity::where('description', 'payment_settled_at_reception')->count());
+
+        $this->act($order, 'accept')->assertOk();
+
+        $entry = Activity::where('description', 'payment_settled_at_reception')->sole();
+        $this->assertSame($this->staff->id, (int) $entry->causer_id);
+        $this->assertSame(Payment::query()->forPayable($order)->sole()->id, (int) $entry->subject_id);
+        $this->assertSame('kitchen_order', $entry->properties['purpose']);
+        $this->assertSame('cash', $entry->properties['collected_via']);
+        $this->assertSame(40, $entry->properties['points_charged']);
+        $this->assertArrayHasKey('received_amount', $entry->properties->toArray());
+        $this->assertArrayHasKey('received_currency', $entry->properties->toArray());
+    }
+
+    public function test_a_currency_with_no_rate_is_a_422_and_nothing_is_written(): void
+    {
+        $order = $this->waiting();
+
+        // SYP exists but has no exchange rate.
+        $this->act($order, 'accept', ['amount' => '500000', 'currency' => 'SYP'])
+            ->assertStatus(422)
+            ->assertJsonPath('message', __('api.payment.currency_unavailable', [], 'en'));
+
+        $order->refresh();
+        $this->assertSame(KitchenOrderStatus::AwaitingReception, $order->status);
+        $this->assertSame(0, Payment::query()->forPayable($order)->count());
+        $this->assertSame(0, Activity::where('description', 'payment_settled_at_reception')->count());
+        $this->getJson('/api/v1/admin/reception/kitchen-orders')->assertJsonCount(1, 'data');
+    }
+
+    public function test_a_page_of_orders_costs_the_same_queries_however_many_there_are(): void
+    {
+        $wallet = Wallet::query()->firstOrCreate(['owner_type' => OwnerType::User, 'owner_id' => $this->member->id]);
+        $make = function (int $count) use ($wallet) {
+            for ($i = 0; $i < $count; $i++) {
+                $order = $this->waiting(['payment_choice' => OrderPaymentChoice::Wallet, 'paid_at' => now()]);
+                Payment::factory()->accepted()->forPayable($order)->create(['wallet_id' => $wallet->id, 'user_id' => $this->member->id]);
+            }
+        };
+        $queries = function (string $url) {
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $response = $this->getJson($url)->assertOk();
+            DB::disableQueryLog();
+
+            return [count(DB::getQueryLog()), $response];
+        };
+
+        $make(2);
+        $this->getJson('/api/v1/admin/reception/kitchen-orders')->assertOk(); // warms the permission cache
+        [$few] = $queries('/api/v1/admin/reception/kitchen-orders');
+        $make(5);
+        [$many, $response] = $queries('/api/v1/admin/reception/kitchen-orders');
+
+        $response->assertJsonCount(7, 'data')->assertJsonPath('data.6.payment.wallet_owner_type', 'user');
+        $this->assertSame($few, $many);
+
+        // The kitchen board's list goes through the same resource.
+        Role::findByName('desk', 'web')->givePermissionTo('kitchen-orders.view');
+        $this->staff->forgetCachedPermissions();
+        KitchenOrder::query()->update(['status' => KitchenOrderStatus::Pending]);
+        $url = "/api/v1/admin/kitchen/orders?branch_id={$this->branch->id}";
+        $this->getJson($url)->assertOk();
+        [$boardMany] = $queries($url);
+        KitchenOrder::query()->limit(5)->delete();
+        [$boardFew] = $queries($url);
+        $this->assertSame($boardFew, $boardMany);
+    }
+
+    public function test_a_member_cancelling_an_order_at_the_desk_drops_its_row(): void
+    {
+        $order = $this->waiting(['payment_choice' => OrderPaymentChoice::Wallet]);
+        Event::fake([KitchenOrderChanged::class, KitchenOrderAwaitingReception::class]);
+
+        Sanctum::actingAs($this->member, ['*']);
+        $this->postJson("/api/v1/member/kitchen-orders/{$order->id}/cancel")->assertOk();
+
+        Event::assertDispatched(KitchenOrderAwaitingReception::class, fn (KitchenOrderAwaitingReception $e) => $e->broadcastWith() === [
+            'order_id' => $order->id, 'branch_id' => $this->branch->id, 'status' => 'cancelled',
+        ]);
+        Event::assertDispatched(KitchenOrderChanged::class);
     }
 }

@@ -88,10 +88,13 @@ class KitchenOrderNotifier
         $this->tellMember($order, 'kitchen_order.rejected_by_reception', ['reason' => (string) $order->rejection_reason]);
     }
 
-    /** The member took it back: the board only. */
-    public function cancelledByMember(KitchenOrder $order): void
+    /**
+     * The member took it back: the board, and the desk's queue when it was
+     * waiting there (`$wasAwaitingReception`) so the row drops.
+     */
+    public function cancelledByMember(KitchenOrder $order, bool $wasAwaitingReception = false): void
     {
-        $this->realtime->send(new KitchenOrderChanged($order));
+        $this->realtime->send(new KitchenOrderChanged($order), ...($wasAwaitingReception ? [new KitchenOrderAwaitingReception($order)] : []));
     }
 
     public function accepted(KitchenOrder $order): void

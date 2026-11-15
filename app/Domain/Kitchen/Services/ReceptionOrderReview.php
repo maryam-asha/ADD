@@ -2,6 +2,7 @@
 
 namespace App\Domain\Kitchen\Services;
 
+use App\Concerns\LogsSensitiveActions;
 use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Payments\PaymentService;
@@ -21,6 +22,8 @@ use Illuminate\Support\Facades\DB;
  */
 class ReceptionOrderReview
 {
+    use LogsSensitiveActions;
+
     public function __construct(
         private readonly PaymentService $payments,
         private readonly KitchenOrderRefunder $refunder,
@@ -43,8 +46,18 @@ class ReceptionOrderReview
             $locked = $this->locked($order);
 
             if ($locked->payment_choice === OrderPaymentChoice::Cash && $locked->paid_at === null) {
-                $this->payments->settleAtReception(PaymentPurpose::KitchenOrder, $locked, PaymentMethod::Cash, $amount, $currency, $staff);
+                $settled = $this->payments->settleAtReception(PaymentPurpose::KitchenOrder, $locked, PaymentMethod::Cash, $amount, $currency, $staff);
                 $locked->refresh();
+
+                // The same entry the desk's cash path writes (ReceptionPaymentController::settle).
+                $this->logSensitiveAction('payment_settled_at_reception', $settled->payment, [
+                    'purpose' => PaymentPurpose::KitchenOrder->value,
+                    'collected_via' => PaymentMethod::Cash->value,
+                    'received_amount' => $settled->payment->received_amount,
+                    'received_currency' => $settled->payment->received_currency,
+                    'points_credited' => $settled->pointsCredited,
+                    'points_charged' => $settled->pointsCharged,
+                ]);
             }
 
             $locked->forceFill([

@@ -280,6 +280,8 @@ class KitchenOrderService
                 KitchenOrderStatus::Pending,
             ], 'api.kitchen.order_not_pending');
 
+            $wasAwaitingReception = $locked->status === KitchenOrderStatus::AwaitingReception;
+
             if ($locked->status === KitchenOrderStatus::AwaitingPayment) {
                 $openCards = $this->openCardPayments($locked->user, $locked->id);
             }
@@ -291,7 +293,7 @@ class KitchenOrderService
             ]);
 
             $this->refunder->refund($locked, __('api.kitchen.refund_description', ['order' => '#'.$locked->id]));
-            $this->notifier->cancelledByMember($locked);
+            $this->notifier->cancelledByMember($locked, $wasAwaitingReception);
         });
 
         $this->cancelOpenCards($openCards);

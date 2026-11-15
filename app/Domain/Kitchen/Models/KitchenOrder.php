@@ -4,6 +4,8 @@ namespace App\Domain\Kitchen\Models;
 
 use Add\Inventory\Warehouses\Models\Warehouse;
 use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Finance\Enums\PaymentStatus;
+use App\Domain\Finance\Models\Payment;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\SeatDesk;
 use App\Domain\Foundation\Models\Space;
@@ -20,6 +22,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 /**
@@ -105,6 +108,12 @@ class KitchenOrder extends Model
     public function lines(): HasMany
     {
         return $this->hasMany(KitchenOrderLine::class);
+    }
+
+    /** The payment that settled the order, the latest accepted one — eager-loadable for a list. */
+    public function acceptedPayment(): MorphOne
+    {
+        return $this->morphOne(Payment::class, 'payable')->where('status', PaymentStatus::Accepted)->ofMany('id', 'max');
     }
 
     /** The coworking session or booking the order is billed to. */
