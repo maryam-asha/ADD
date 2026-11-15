@@ -14,7 +14,8 @@ use Illuminate\Http\Request;
  * Also what reception needs to decide: the `route` it was sent on, how it is
  * paid (`payment.wallet_owner_type` is whose wallet paid — `user` or
  * `company` — null while nothing has), `cash_due_points` for a cash order
- * not yet paid, and `bill` null when it has none.
+ * not yet paid, `cash_return` once an order that was not made left cash
+ * owed to the member, and `bill` null when it has none.
  *
  * @mixin KitchenOrder
  */
@@ -33,6 +34,7 @@ class AdminKitchenOrderResource extends KitchenOrderResource
             ...parent::toArray($request),
             'bill' => $this->hasBill() ? ['type' => $this->billType(), 'id' => $this->billable_id] : null,
             'route' => $this->route?->value,
+            'cash_return' => $this->cash_return?->value,
             'payment' => [
                 'choice' => $this->payment_choice?->value,
                 'wallet_owner_type' => $this->walletOwnerType(),

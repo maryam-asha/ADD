@@ -71,7 +71,14 @@ final class FinanceOverview
             ->where('created_at', '<', $period->end);
 
         return [
-            'cash' => $this->perCurrency((clone $accepted)->whereNotNull('received_amount'), 'received_currency', 'received_amount'),
+            // Cash handed back across the desk is not cash received; cash credited as points was kept.
+            'cash' => $this->perCurrency(
+                (clone $accepted)
+                    ->whereNotNull('received_amount')
+                    ->where(fn ($query) => $query->whereNull('refunded_at')->orWhereNotNull('refund_transaction_id')),
+                'received_currency',
+                'received_amount',
+            ),
             'card' => $this->perCurrency((clone $accepted)->whereNotNull('charged_amount'), 'currency', 'charged_amount'),
             'invoice_payments' => $this->perCurrency(
                 InvoicePayment::query()

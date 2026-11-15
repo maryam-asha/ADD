@@ -865,6 +865,8 @@ return [
         'payment_method_not_offered' => 'That way of paying is not offered for this order.',
         'order_not_awaiting_payment' => 'This order is no longer waiting for its payment.',
         'order_not_awaiting_reception' => 'This order is not waiting for reception any more.',
+        'no_cash_owed' => 'No cash is owed to the member for this order.',
+        'cash_returned_description' => 'Cash for kitchen order :order credited as points',
     ],
 
     // Paying for a kitchen order, its own payable (App\Domain\Kitchen).

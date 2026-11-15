@@ -67,6 +67,7 @@ use App\Http\Controllers\Api\V1\Admin\ProviderUserController;
 use App\Http\Controllers\Api\V1\Admin\QrPointController;
 use App\Http\Controllers\Api\V1\Admin\Reception\AccessActivationController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ArrivalRequestController as ReceptionArrivalRequestController;
+use App\Http\Controllers\Api\V1\Admin\Reception\KitchenCashReturnController;
 use App\Http\Controllers\Api\V1\Admin\Reception\KitchenOrderReviewController;
 use App\Http\Controllers\Api\V1\Admin\Reception\BookingReceptionController;
 use App\Http\Controllers\Api\V1\Admin\Reception\CashRegisterSessionController;
@@ -496,6 +497,11 @@ Route::post('reception/session-end-requests/{sessionEndRequest}/confirm', [Sessi
 Route::get('reception/kitchen-orders', [KitchenOrderReviewController::class, 'index'])->middleware('permission:kitchen-orders.review');
 Route::post('reception/kitchen-orders/{order}/accept', [KitchenOrderReviewController::class, 'accept'])->middleware('permission:kitchen-orders.review');
 Route::post('reception/kitchen-orders/{order}/reject', [KitchenOrderReviewController::class, 'reject'])->middleware('permission:kitchen-orders.review');
+
+// Cash taken for an order that was not made: handed back, or credited as points.
+Route::get('reception/kitchen-cash-returns', [KitchenCashReturnController::class, 'index'])->middleware('permission:kitchen-orders.review');
+Route::post('reception/kitchen-cash-returns/{order}/returned', [KitchenCashReturnController::class, 'returned'])->middleware('permission:kitchen-orders.review');
+Route::post('reception/kitchen-cash-returns/{order}/credit-points', [KitchenCashReturnController::class, 'creditPoints'])->middleware('permission:kitchen-orders.review');
 
 Route::get('reception/arrival-requests', [ReceptionArrivalRequestController::class, 'index'])->middleware('permission:reception.view');
 Route::post('reception/arrival-requests/{arrivalRequest}/confirm', [ReceptionArrivalRequestController::class, 'confirm'])->middleware('permission:reception.check_in');

@@ -850,6 +850,8 @@ return [
         'payment_method_not_offered' => 'طريقة الدفع هذه غير متاحة لهذا الطلب.',
         'order_not_awaiting_payment' => 'لم يعد هذا الطلب بانتظار دفعه.',
         'order_not_awaiting_reception' => 'هذا الطلب لم يعد بانتظار الاستقبال.',
+        'no_cash_owed' => 'لا يوجد مبلغ نقدي مستحق للعضو على هذا الطلب.',
+        'cash_returned_description' => 'المبلغ النقدي للطلب :order محوّل إلى نقاط',
     ],
 
     // دفع طلب المطبخ، كدفعة مستقلة (App\Domain\Kitchen).
