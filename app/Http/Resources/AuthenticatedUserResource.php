@@ -4,6 +4,8 @@ namespace App\Http\Resources;
 
 use App\Domain\Finance\Services\CurrencyConversionService;
 use App\Domain\Finance\Services\PointConversionService;
+use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Membership\Services\MembershipBranchResolver;
 use Illuminate\Http\Request;
 
 /**
@@ -27,6 +29,9 @@ class AuthenticatedUserResource extends UserResource
     {
         return [
             ...parent::toArray($request),
+            // The member's home branch, else the default one — null only when
+            // no branch exists at all.
+            'branch_id' => app(MembershipBranchResolver::class)->branchFor(OwnerType::User, $this->id),
             'rates' => [
                 'usd_to_syp' => self::number(app(CurrencyConversionService::class)->baseToCurrencyRate('SYP')),
                 'point_rate_usd' => self::number(app(PointConversionService::class)->plainRate()),
