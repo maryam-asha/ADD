@@ -12,6 +12,7 @@ use App\Domain\Booking\Services\CoworkingSessionService;
 use App\Domain\Booking\Services\CurrentBookingLocator;
 use App\Domain\Ecosystem\Enums\AnnouncementPlacement;
 use App\Domain\Ecosystem\Models\Announcement;
+use App\Domain\Ecosystem\Models\QuickAccessShortcut;
 use App\Domain\Experience\Models\Event;
 use App\Domain\Experience\Models\EventSession;
 use App\Domain\Experience\Services\EventBrowseService;
@@ -19,9 +20,12 @@ use App\Domain\Finance\Payments\OutstandingItems;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
+use App\Domain\Kitchen\Enums\KitchenOrderStatus;
+use App\Domain\Kitchen\Models\KitchenOrder;
 use App\Domain\Kitchen\Services\KitchenOrderSettlement;
 use App\Domain\Services\Models\ServiceType;
 use App\Domain\Services\Services\ServiceCatalogService;
+use App\Http\Resources\Kitchen\KitchenOrderResource;
 use App\Support\Enums\EventRegistrationStatus;
 use App\Support\Presenters\PaymentStatePresenter;
 use App\Support\Time\LocalTime;
@@ -40,6 +44,9 @@ use Illuminate\Support\Str;
  */
 class MemberHomeService
 {
+    /** How many of the member's latest café orders the "order again" slider shows. */
+    private const RECENT_ORDERS = 4;
+
     public function __construct(
         private readonly CoworkingSessionService $sessions,
         private readonly CurrentBookingLocator $bookings,
@@ -77,6 +84,8 @@ class MemberHomeService
                 'active_session' => null,
                 'active_booking' => [],
                 'banners' => $this->banners($locale),
+                'quick_access' => $this->quickAccess($locale),
+                'recent_orders' => [],
                 'today' => [],
                 'explore' => $this->explore(null, $locale),
             ];
@@ -115,6 +124,8 @@ class MemberHomeService
                 [...$live, ...$owedBookings],
             ),
             'banners' => $this->banners($locale),
+            'quick_access' => $this->quickAccess($locale),
+            'recent_orders' => $this->recentOrders($member),
             'today' => $this->today($member, $shown, $now, $dayStart, $dayEnd, $locale),
             'explore' => $this->explore($member, $locale),
         ];
@@ -301,6 +312,50 @@ class MemberHomeService
                 'image_url' => $announcement->image_url,
                 'link_url' => $announcement->link_url,
             ])
+            ->all();
+    }
+
+    /**
+     * The quick-access tiles set from the dashboard (admin/quick-access-shortcuts),
+     * the active ones in their order: `key`, the label in the request's
+     * language, `icon_url`, and `route`, the app's static route the tile opens.
+     *
+     * @return list<array{id: int, key: string, label: ?string, icon_url: ?string, route: string}>
+     */
+    private function quickAccess(string $locale): array
+    {
+        return QuickAccessShortcut::query()
+            ->shown()
+            ->get()
+            ->map(fn (QuickAccessShortcut $shortcut) => [
+                'id' => $shortcut->id,
+                'key' => $shortcut->key,
+                'label' => $shortcut->translate('label', $locale),
+                'icon_url' => $shortcut->icon_url,
+                'route' => $shortcut->route,
+            ])
+            ->all();
+    }
+
+    /**
+     * The "order again" slider: the member's last four delivered café
+     * orders, most recently delivered first — each one as GET
+     * member/kitchen-orders shows it, so reordering is POST
+     * member/kitchen-orders with its lines.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function recentOrders(User $member): array
+    {
+        return KitchenOrder::query()
+            ->where('user_id', $member->id)
+            ->where('status', KitchenOrderStatus::Delivered)
+            ->with('lines.item', 'seatDesk', 'space', 'acceptedPayment')
+            ->latest('delivered_at')
+            ->latest('id')
+            ->limit(self::RECENT_ORDERS)
+            ->get()
+            ->map(fn (KitchenOrder $order) => (new KitchenOrderResource($order))->resolve(request()))
             ->all();
     }
 

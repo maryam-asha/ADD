@@ -47,6 +47,7 @@ class KitchenOrderResource extends JsonResource
             'lines' => $this->lines->map(fn (KitchenOrderLine $line) => [
                 'sale_item_id' => $line->sale_item_id,
                 'name' => $line->item?->translate('name'),
+                'image_url' => $line->item?->image_url,
                 'quantity' => $line->quantity,
                 'unit_price_points' => $line->unit_price_points,
                 'line_points' => $line->line_points,

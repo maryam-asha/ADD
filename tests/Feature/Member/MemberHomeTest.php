@@ -11,6 +11,7 @@ use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Ecosystem\Models\Announcement;
 use App\Domain\Ecosystem\Models\EventAttendee;
+use App\Domain\Ecosystem\Models\QuickAccessShortcut;
 use App\Domain\Experience\Models\Event;
 use App\Domain\Experience\Models\EventSession;
 use App\Domain\Finance\Enums\PaymentPurpose;
@@ -21,6 +22,8 @@ use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Building;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
+use App\Domain\Kitchen\Enums\KitchenOrderStatus;
+use App\Domain\Kitchen\Models\KitchenOrder;
 use App\Domain\Services\Models\ServiceAxis;
 use App\Domain\Services\Models\ServiceType;
 use Carbon\Carbon;
@@ -82,9 +85,66 @@ class MemberHomeTest extends TestCase
             'active_session' => null,
             'active_booking' => [],
             'banners' => [],
+            'quick_access' => [
+                // The four the migration starts with, no icons until the dashboard sets them.
+                ['id' => 1, 'key' => 'packages', 'label' => 'Packages', 'icon_url' => null, 'route' => '/packages'],
+                ['id' => 2, 'key' => 'cafe', 'label' => 'Cafe', 'icon_url' => null, 'route' => '/cafe-menu'],
+                ['id' => 3, 'key' => 'transactions', 'label' => 'Transactions', 'icon_url' => null, 'route' => '/wallet'],
+                ['id' => 4, 'key' => 'sessions', 'label' => 'Sessions', 'icon_url' => null, 'route' => '/sessions'],
+            ],
+            'recent_orders' => [],
             'today' => [],
             'explore' => [],
         ]]);
+    }
+
+    public function test_quick_access_is_the_active_dashboard_shortcuts_in_their_order(): void
+    {
+        QuickAccessShortcut::query()->delete();
+        QuickAccessShortcut::factory()->create([
+            'key' => 'wallet', 'label' => ['en' => 'Wallet', 'ar' => 'المحفظة'], 'route' => '/wallet', 'order' => 2,
+            'icon_url' => 'https://example.com/icons/wallet.png',
+        ]);
+        QuickAccessShortcut::factory()->create(['key' => 'cafe', 'route' => '/cafe-menu', 'order' => 1]);
+        QuickAccessShortcut::factory()->create(['key' => 'hidden', 'order' => 0, 'is_active' => false]);
+
+        $this->home('ar')
+            ->assertJsonPath('data.quick_access.*.key', ['cafe', 'wallet'])
+            ->assertJsonPath('data.quick_access.1.label', 'المحفظة')
+            ->assertJsonPath('data.quick_access.1.icon_url', 'https://example.com/icons/wallet.png')
+            ->assertJsonPath('data.quick_access.1.route', '/wallet');
+
+        // A visitor gets the same tiles.
+        $this->app['auth']->forgetGuards();
+
+        $this->home()->assertJsonPath('data.quick_access.*.key', ['cafe', 'wallet']);
+    }
+
+    public function test_recent_orders_are_the_members_last_four_delivered_kitchen_orders(): void
+    {
+        $delivered = collect(range(1, 5))->map(fn (int $i) => KitchenOrder::factory()->withoutBill()->create([
+            'user_id' => $this->member->id,
+            'status' => KitchenOrderStatus::Delivered,
+            'total_points' => $i * 100,
+            'delivered_at' => now()->subDays(6 - $i),
+        ]));
+        // Newer, but not delivered: never on the slider.
+        foreach ([KitchenOrderStatus::Pending, KitchenOrderStatus::Ready, KitchenOrderStatus::Cancelled, KitchenOrderStatus::Rejected] as $status) {
+            KitchenOrder::factory()->withoutBill()->create(['user_id' => $this->member->id, 'status' => $status]);
+        }
+        // Someone else's delivered order is never on the member's home.
+        KitchenOrder::factory()->withoutBill()->create(['status' => KitchenOrderStatus::Delivered, 'delivered_at' => now()]);
+
+        $response = $this->home();
+
+        $response->assertJsonCount(4, 'data.recent_orders');
+        $response->assertJsonPath('data.recent_orders.*.id', $delivered->reverse()->take(4)->pluck('id')->values()->all());
+        $response->assertJsonPath('data.recent_orders.*.status', array_fill(0, 4, 'delivered'));
+        $response->assertJsonPath('data.recent_orders.0.total_points', 500);
+        $response->assertJsonStructure(['data' => ['recent_orders' => [['id', 'status', 'lines', 'total_points', 'timestamps' => ['submitted_at']]]]]);
+
+        $this->app['auth']->forgetGuards();
+        $this->home()->assertJsonPath('data.recent_orders', []);
     }
 
     public function test_the_greeting_follows_the_district_clock_and_the_language(): void

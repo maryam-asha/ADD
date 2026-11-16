@@ -187,6 +187,7 @@ return [
         'currency_status_updated' => 'تم تحديث حالة العملة.',
         'currency_base_updated' => 'تم تحديث العملة الأساسية.',
         'announcement_updated' => 'تم تحديث الإعلان.',
+        'quick_access_shortcut_updated' => 'تم تحديث الاختصار.',
         'exchange_rate_suggestion_dismissed' => 'تم رفض اقتراح سعر الصرف.',
         'exchange_rate_suggestion_not_pending' => 'يمكن رفض الاقتراح المعلّق فقط.',
         'role_updated' => 'تم تحديث الدور.',

@@ -65,13 +65,14 @@ use App\Http\Controllers\Api\V1\Admin\ProviderController;
 use App\Http\Controllers\Api\V1\Admin\ProviderRequestController;
 use App\Http\Controllers\Api\V1\Admin\ProviderUserController;
 use App\Http\Controllers\Api\V1\Admin\QrPointController;
+use App\Http\Controllers\Api\V1\Admin\QuickAccessShortcutController;
 use App\Http\Controllers\Api\V1\Admin\Reception\AccessActivationController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ArrivalRequestController as ReceptionArrivalRequestController;
-use App\Http\Controllers\Api\V1\Admin\Reception\KitchenCashReturnController;
-use App\Http\Controllers\Api\V1\Admin\Reception\KitchenOrderReviewController;
 use App\Http\Controllers\Api\V1\Admin\Reception\BookingReceptionController;
 use App\Http\Controllers\Api\V1\Admin\Reception\CashRegisterSessionController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ItemSaleController as ReceptionItemSaleController;
+use App\Http\Controllers\Api\V1\Admin\Reception\KitchenCashReturnController;
+use App\Http\Controllers\Api\V1\Admin\Reception\KitchenOrderReviewController;
 use App\Http\Controllers\Api\V1\Admin\Reception\PlanPurchaseController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ReceptionPaymentController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ReceptionSessionsController;
@@ -283,6 +284,10 @@ $permitted(Route::apiResource('contact-links', ContactLinkController::class)
 // `{announcement}` does not swallow it.
 Route::get('announcements/options', [AnnouncementController::class, 'options'])->middleware('permission:announcements.view');
 $permitted(Route::apiResource('announcements', AnnouncementController::class), 'announcements');
+// The member app home's quick-access tiles (label, icon image, app route);
+// GET member/home shows the active ones in their order.
+$permitted(Route::apiResource('quick-access-shortcuts', QuickAccessShortcutController::class)
+    ->parameters(['quick-access-shortcuts' => 'quickAccessShortcut']), 'quick-access-shortcuts');
 $permitted(Route::apiResource('event-categories', EventCategoryController::class)
     ->parameters(['event-categories' => 'eventCategory']), 'event-categories');
 Route::get('events/rooms', [EventController::class, 'rooms'])->middleware('permission:events.view');

@@ -187,6 +187,7 @@ return [
         'currency_status_updated' => 'Currency status updated.',
         'currency_base_updated' => 'Base currency updated.',
         'announcement_updated' => 'Announcement updated.',
+        'quick_access_shortcut_updated' => 'Shortcut updated.',
         'exchange_rate_suggestion_dismissed' => 'Exchange rate suggestion dismissed.',
         'exchange_rate_suggestion_not_pending' => 'Only a pending suggestion can be dismissed.',
         'role_updated' => 'Role updated.',
