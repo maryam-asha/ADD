@@ -126,6 +126,50 @@ class ReceptionReviewTest extends TestCase
             ->assertJsonStructure(['data', 'links', 'meta']);
     }
 
+    public function test_a_cash_order_says_what_to_collect_in_money_and_a_paid_one_does_not(): void
+    {
+        $this->waiting();
+        $this->waiting(['payment_choice' => OrderPaymentChoice::Wallet, 'paid_at' => now()]);
+
+        $rows = collect($this->getJson('/api/v1/admin/reception/kitchen-orders')->assertOk()->json('data'))->keyBy(fn (array $row) => $row['payment']['choice']);
+
+        $amounts = $rows['cash']['cash_due_amounts'];
+        $this->assertSame('USD', $amounts[0]['currency']);
+        $this->assertSame('4', PlainAmount::of($amounts[0]['value']));
+        // A currency with no rate yet is left out rather than refused.
+        $this->assertNotContains('SYP', array_column($amounts, 'currency'));
+
+        $this->assertNull($rows['wallet']['cash_due_points']);
+        $this->assertNull($rows['wallet']['cash_due_amounts']);
+    }
+
+    public function test_a_page_of_cash_orders_reads_the_currencies_once_and_prices_each_total_once(): void
+    {
+        $queries = function () {
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $this->getJson('/api/v1/admin/reception/kitchen-orders')->assertOk();
+            DB::disableQueryLog();
+
+            return collect(DB::getQueryLog())->pluck('query');
+        };
+
+        $this->waiting();
+        $this->waiting();
+        $this->getJson('/api/v1/admin/reception/kitchen-orders')->assertOk(); // warms the permission cache
+        $few = $queries();
+        for ($i = 0; $i < 5; $i++) {
+            $this->waiting();
+        }
+        $many = $queries();
+
+        // Seven orders of the same total cost what two do.
+        $this->assertSame($few->count(), $many->count());
+        // The active currencies are read at most once a request (none here:
+        // the warm-up request in this same app already read them).
+        $this->assertLessThanOrEqual(1, $many->filter(fn (string $sql) => str_contains($sql, 'is_active'))->count());
+    }
+
     public function test_accepting_sends_it_to_the_kitchen_board(): void
     {
         $order = $this->waiting(['payment_choice' => OrderPaymentChoice::Wallet, 'paid_at' => now()]);

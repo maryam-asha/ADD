@@ -16,6 +16,7 @@ use App\Domain\Finance\Payments\Fulfillers\WalletTopUpFulfiller;
 use App\Domain\Finance\Payments\PaymentMethodRegistry;
 use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Finance\Payments\PendingPaymentsWatcher;
+use App\Domain\Finance\Payments\PointsInCurrencies;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
 
@@ -49,6 +50,8 @@ class PaymentServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(PaymentMethodRegistry::class);
+
+        $this->app->scoped(PointsInCurrencies::class);
 
         $this->app->singleton(
             FulfillerRegistry::class,

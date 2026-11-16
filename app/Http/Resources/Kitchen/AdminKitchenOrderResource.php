@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Kitchen;
 
+use App\Domain\Finance\Payments\PointsInCurrencies;
 use App\Domain\Kitchen\Enums\OrderPaymentChoice;
 use App\Domain\Kitchen\Models\KitchenOrder;
 use Illuminate\Http\Request;
@@ -40,7 +41,9 @@ class AdminKitchenOrderResource extends KitchenOrderResource
                 'wallet_owner_type' => $this->walletOwnerType(),
                 'paid' => $this->paid_at !== null,
             ],
-            'cash_due_points' => $this->payment_choice === OrderPaymentChoice::Cash && $this->paid_at === null ? $this->total_points : null,
+            'cash_due_points' => $this->cashDuePoints(),
+            // What the desk collects, in each active currency with a rate.
+            'cash_due_amounts' => $this->cashDuePoints() === null ? null : app(PointsInCurrencies::class)->for($this->cashDuePoints()),
             'member' => $this->user === null ? null : [
                 'id' => $this->user->id,
                 'name' => $this->user->name,
@@ -48,6 +51,12 @@ class AdminKitchenOrderResource extends KitchenOrderResource
             ],
             'waited_seconds' => $this->created_at === null ? 0 : max(0, (int) $this->created_at->diffInSeconds($until)),
         ];
+    }
+
+    /** The points a cash order still owes the desk; null for anything else. */
+    private function cashDuePoints(): ?int
+    {
+        return $this->payment_choice === OrderPaymentChoice::Cash && $this->paid_at === null ? (int) $this->total_points : null;
     }
 
     /** Whose wallet paid the order — from its accepted payment; null when none has. */

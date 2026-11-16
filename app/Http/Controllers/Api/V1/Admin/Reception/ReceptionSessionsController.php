@@ -8,9 +8,8 @@ use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Booking\Services\CoworkingSessionService;
 use App\Domain\Booking\Services\SessionClosureService;
 use App\Domain\Booking\Services\SessionReportBuilder;
-use App\Domain\Finance\Exceptions\PaymentPricingException;
-use App\Domain\Finance\Models\Currency;
 use App\Domain\Finance\Models\Payment;
+use App\Domain\Finance\Payments\PointsInCurrencies;
 use App\Domain\Finance\Services\ReceivedMoneyConverter;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
@@ -164,17 +163,7 @@ class ReceptionSessionsController extends Controller
      */
     private function amountsFor(int $points, ReceivedMoneyConverter $converter): array
     {
-        return Currency::query()->where('is_active', true)->orderByDesc('is_base')->orderBy('order')->pluck('code')
-            ->map(function (string $code) use ($converter, $points) {
-                try {
-                    return ['currency' => $code, 'value' => PlainAmount::of($converter->pointsToAmount($points, $code))];
-                } catch (PaymentPricingException) {
-                    return null;
-                }
-            })
-            ->filter()
-            ->values()
-            ->all();
+        return app(PointsInCurrencies::class)->for($points);
     }
 
     private function isOverdue(SessionClosureService $closures, Booking|WalkinSession $session, Carbon $now): bool
