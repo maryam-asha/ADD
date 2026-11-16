@@ -139,19 +139,39 @@ class KitchenController extends Controller
         );
     }
 
-    /** GET member/kitchen-orders — the open orders, then the last 20 closed, newest first in each. */
+    /**
+     * GET member/kitchen-orders — the open orders, then the closed ones,
+     * newest first in each. Paginated like the other member listings —
+     * `?per_page=` (1..100, default 15) and `?page=` — the orders under
+     * `data`, the page counters under `meta`.
+     */
     public function index(Request $request): JsonResponse
     {
-        $mine = fn () => KitchenOrder::query()
+        $validated = $request->validate([
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+
+        $open = KitchenOrderStatus::openValues();
+
+        $paginator = KitchenOrder::query()
             ->where('user_id', $request->user()->id)
             ->with('lines.item', 'seatDesk', 'space')
+            // Open first: one ordering across pages, so no order shows twice or not at all.
+            ->orderByRaw('case when status in ('.implode(',', array_fill(0, count($open), '?')).') then 0 else 1 end', $open)
             ->latest()
-            ->latest('id');
+            ->latest('id')
+            ->paginate((int) ($validated['per_page'] ?? 15));
 
-        $open = $mine()->open()->get();
-        $closed = $mine()->whereNotIn('status', KitchenOrderStatus::openValues())->limit(20)->get();
-
-        return response()->json(['data' => KitchenOrderResource::collection($open->concat($closed))]);
+        return response()->json([
+            'data' => KitchenOrderResource::collection($paginator->items())->resolve($request),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ]);
     }
 
     /** GET member/kitchen-orders/{order} — the member's own only. */

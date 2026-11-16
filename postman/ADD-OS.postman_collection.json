@@ -15979,9 +15979,23 @@
                                         "v1",
                                         "member",
                                         "kitchen-orders"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true,
+                                            "description": "Optional. The page, from 1 (default 1)."
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "disabled": true,
+                                            "description": "Optional. Orders per page, 1..100 (default 15); above 100 is a 422."
+                                        }
                                     ]
                                 },
-                                "description": "The member's open orders (awaiting_payment, awaiting_reception, pending, preparing, ready), then the last 20 closed ones, newest first in each. Not paginated. Each order is as in Get Order.",
+                                "description": "The member's open orders (awaiting_payment, awaiting_reception, pending, preparing, ready), then the closed ones, newest first in each. Each order is as in Get Order.\n\nPaginated like the other member listings: `?per_page=` (1..100, default 15) and `?page=`. The orders are in `data`, the page counters (`current_page`, `last_page`, `per_page`, `total`) in `meta` beside it. Open orders come first across the pages, so the first page holds them. A `per_page` above 100 or below 1, or a `page` below 1, is a 422.\n\n### Cases - see this request's saved examples\n- **200 OK** - the first page.\n- **Second Page** - 200, `?page=2&per_page=2`: a delivered order, since open ones fill the first pages; `meta.current_page` 2.\n- **per_page Above 100** - 422.",
                                 "auth": {
                                     "type": "bearer",
                                     "bearer": [
@@ -16019,9 +16033,23 @@
                                                 "v1",
                                                 "member",
                                                 "kitchen-orders"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "page",
+                                                    "value": "1",
+                                                    "disabled": true,
+                                                    "description": "Optional. The page, from 1 (default 1)."
+                                                },
+                                                {
+                                                    "key": "per_page",
+                                                    "value": "15",
+                                                    "disabled": true,
+                                                    "description": "Optional. Orders per page, 1..100 (default 15); above 100 is a 422."
+                                                }
                                             ]
                                         },
-                                        "description": "The member's open orders (awaiting_payment, awaiting_reception, pending, preparing, ready), then the last 20 closed ones, newest first in each. Not paginated. Each order is as in Get Order.",
+                                        "description": "The member's open orders (awaiting_payment, awaiting_reception, pending, preparing, ready), then the closed ones, newest first in each. Each order is as in Get Order.\n\nPaginated like the other member listings: `?per_page=` (1..100, default 15) and `?page=`. The orders are in `data`, the page counters (`current_page`, `last_page`, `per_page`, `total`) in `meta` beside it. Open orders come first across the pages, so the first page holds them. A `per_page` above 100 or below 1, or a `page` below 1, is a 422.\n\n### Cases - see this request's saved examples\n- **200 OK** - the first page.\n- **Second Page** - 200, `?page=2&per_page=2`: a delivered order, since open ones fill the first pages; `meta.current_page` 2.\n- **per_page Above 100** - 422.",
                                         "auth": {
                                             "type": "bearer",
                                             "bearer": [
@@ -16042,7 +16070,137 @@
                                         }
                                     ],
                                     "cookie": [],
-                                    "body": "{\n    \"data\": [\n        {\n            \"id\": 41,\n            \"status\": \"preparing\",\n            \"source\": \"qr\",\n            \"delivery\": {\n                \"type\": \"desk\",\n                \"label\": \"Desk 03\",\n                \"note\": null\n            },\n            \"route\": \"kitchen\",\n            \"bill\": {\n                \"type\": \"walkin\",\n                \"id\": 17\n            },\n            \"payment\": {\n                \"choice\": \"bill\",\n                \"paid\": false,\n                \"refunded\": false,\n                \"cash_return\": null\n            },\n            \"payment_due_at\": null,\n            \"lines\": [\n                {\n                    \"sale_item_id\": 1,\n                    \"name\": \"Bottled water\",\n                    \"quantity\": 2,\n                    \"unit_price_points\": 10,\n                    \"line_points\": 20\n                },\n                {\n                    \"sale_item_id\": 3,\n                    \"name\": \"Chocolate bar\",\n                    \"quantity\": 1,\n                    \"unit_price_points\": 12,\n                    \"line_points\": 12\n                }\n            ],\n            \"total_points\": 32,\n            \"rejection_reason\": null,\n            \"cancelled_by\": null,\n            \"timestamps\": {\n                \"submitted_at\": \"2026-11-11T09:30:00+00:00\",\n                \"accepted_at\": \"2026-11-11T09:31:00+00:00\",\n                \"ready_at\": null,\n                \"delivered_at\": null\n            },\n            \"paid\": false\n        }\n    ]\n}"
+                                    "body": "{\n    \"data\": [\n        {\n            \"id\": 41,\n            \"status\": \"preparing\",\n            \"source\": \"qr\",\n            \"delivery\": {\n                \"type\": \"desk\",\n                \"label\": \"Desk 03\",\n                \"note\": null\n            },\n            \"route\": \"kitchen\",\n            \"bill\": {\n                \"type\": \"walkin\",\n                \"id\": 17\n            },\n            \"payment\": {\n                \"choice\": \"bill\",\n                \"paid\": false,\n                \"refunded\": false,\n                \"cash_return\": null\n            },\n            \"payment_due_at\": null,\n            \"lines\": [\n                {\n                    \"sale_item_id\": 1,\n                    \"name\": \"Bottled water\",\n                    \"quantity\": 2,\n                    \"unit_price_points\": 10,\n                    \"line_points\": 20\n                },\n                {\n                    \"sale_item_id\": 3,\n                    \"name\": \"Chocolate bar\",\n                    \"quantity\": 1,\n                    \"unit_price_points\": 12,\n                    \"line_points\": 12\n                }\n            ],\n            \"total_points\": 32,\n            \"rejection_reason\": null,\n            \"cancelled_by\": null,\n            \"timestamps\": {\n                \"submitted_at\": \"2026-11-11T09:30:00+00:00\",\n                \"accepted_at\": \"2026-11-11T09:31:00+00:00\",\n                \"ready_at\": null,\n                \"delivered_at\": null\n            },\n            \"paid\": false\n        }\n    ],\n    \"meta\": {\n        \"current_page\": 1,\n        \"last_page\": 1,\n        \"per_page\": 15,\n        \"total\": 1\n    }\n}"
+                                },
+                                {
+                                    "name": "Second Page",
+                                    "originalRequest": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/kitchen-orders?page=2&per_page=2",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "kitchen-orders"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "page",
+                                                    "value": "2",
+                                                    "disabled": false,
+                                                    "description": "Optional. The page, from 1 (default 1)."
+                                                },
+                                                {
+                                                    "key": "per_page",
+                                                    "value": "2",
+                                                    "disabled": false,
+                                                    "description": "Optional. Orders per page, 1..100 (default 15); above 100 is a 422."
+                                                }
+                                            ]
+                                        },
+                                        "description": "The member's open orders (awaiting_payment, awaiting_reception, pending, preparing, ready), then the closed ones, newest first in each. Each order is as in Get Order.\n\nPaginated like the other member listings: `?per_page=` (1..100, default 15) and `?page=`. The orders are in `data`, the page counters (`current_page`, `last_page`, `per_page`, `total`) in `meta` beside it. Open orders come first across the pages, so the first page holds them. A `per_page` above 100 or below 1, or a `page` below 1, is a 422.\n\n### Cases - see this request's saved examples\n- **200 OK** - the first page.\n- **Second Page** - 200, `?page=2&per_page=2`: a delivered order, since open ones fill the first pages; `meta.current_page` 2.\n- **per_page Above 100** - 422.",
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": [\n        {\n            \"id\": 35,\n            \"status\": \"delivered\",\n            \"source\": \"qr\",\n            \"delivery\": {\n                \"type\": \"desk\",\n                \"label\": \"Desk 03\",\n                \"note\": null\n            },\n            \"route\": \"kitchen\",\n            \"bill\": {\n                \"type\": \"walkin\",\n                \"id\": 12\n            },\n            \"payment\": {\n                \"choice\": \"bill\",\n                \"paid\": true,\n                \"refunded\": false,\n                \"cash_return\": null\n            },\n            \"payment_due_at\": null,\n            \"lines\": [\n                {\n                    \"sale_item_id\": 1,\n                    \"name\": \"Bottled water\",\n                    \"quantity\": 2,\n                    \"unit_price_points\": 10,\n                    \"line_points\": 20\n                },\n                {\n                    \"sale_item_id\": 3,\n                    \"name\": \"Chocolate bar\",\n                    \"quantity\": 1,\n                    \"unit_price_points\": 12,\n                    \"line_points\": 12\n                }\n            ],\n            \"total_points\": 32,\n            \"rejection_reason\": null,\n            \"cancelled_by\": null,\n            \"timestamps\": {\n                \"submitted_at\": \"2026-11-10T14:05:00+00:00\",\n                \"accepted_at\": \"2026-11-10T14:06:00+00:00\",\n                \"ready_at\": \"2026-11-10T14:15:00+00:00\",\n                \"delivered_at\": \"2026-11-10T14:18:00+00:00\"\n            },\n            \"paid\": true\n        }\n    ],\n    \"meta\": {\n        \"current_page\": 2,\n        \"last_page\": 2,\n        \"per_page\": 2,\n        \"total\": 3\n    }\n}"
+                                },
+                                {
+                                    "name": "per_page Above 100",
+                                    "originalRequest": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/kitchen-orders?per_page=101",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "kitchen-orders"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "page",
+                                                    "value": "1",
+                                                    "disabled": true,
+                                                    "description": "Optional. The page, from 1 (default 1)."
+                                                },
+                                                {
+                                                    "key": "per_page",
+                                                    "value": "101",
+                                                    "disabled": false,
+                                                    "description": "Optional. Orders per page, 1..100 (default 15); above 100 is a 422."
+                                                }
+                                            ]
+                                        },
+                                        "description": "The member's open orders (awaiting_payment, awaiting_reception, pending, preparing, ready), then the closed ones, newest first in each. Each order is as in Get Order.\n\nPaginated like the other member listings: `?per_page=` (1..100, default 15) and `?page=`. The orders are in `data`, the page counters (`current_page`, `last_page`, `per_page`, `total`) in `meta` beside it. Open orders come first across the pages, so the first page holds them. A `per_page` above 100 or below 1, or a `page` below 1, is a 422.\n\n### Cases - see this request's saved examples\n- **200 OK** - the first page.\n- **Second Page** - 200, `?page=2&per_page=2`: a delivered order, since open ones fill the first pages; `meta.current_page` 2.\n- **per_page Above 100** - 422.",
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "status": "Unprocessable Content",
+                                    "code": 422,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"The per page field must not be greater than 100.\",\n    \"errors\": {\n        \"per_page\": [\n            \"The per page field must not be greater than 100.\"\n        ]\n    }\n}"
                                 }
                             ]
                         },

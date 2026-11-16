@@ -392,6 +392,33 @@ class MemberKitchenOrderTest extends TestCase
         $this->getJson("/api/v1/member/kitchen-orders/{$first}")->assertOk()->assertJsonPath('data.id', $first);
     }
 
+    public function test_orders_are_paginated_with_meta_beside_data(): void
+    {
+        $this->walkin();
+        $closed = $this->send(1, ['delivery' => ['type' => 'pickup']])->json('data.id');
+        $this->postJson("/api/v1/member/kitchen-orders/{$closed}/cancel")->assertOk();
+        $older = $this->send(1, ['delivery' => ['type' => 'pickup']])->json('data.id');
+        $newer = $this->send(1, ['delivery' => ['type' => 'pickup']])->json('data.id');
+        KitchenOrder::factory()->create();
+
+        // Open orders first across the pages, the closed one last.
+        $this->getJson('/api/v1/member/kitchen-orders?per_page=2')
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.id', $newer)
+            ->assertJsonPath('data.1.id', $older)
+            ->assertJsonPath('meta', ['current_page' => 1, 'last_page' => 2, 'per_page' => 2, 'total' => 3]);
+
+        $this->getJson('/api/v1/member/kitchen-orders?per_page=2&page=2')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $closed)
+            ->assertJsonPath('meta.current_page', 2);
+
+        $this->getJson('/api/v1/member/kitchen-orders')->assertJsonPath('meta.per_page', 15);
+        $this->getJson('/api/v1/member/kitchen-orders?per_page=101')->assertUnprocessable();
+    }
+
     public function test_cannot_see_another_members_order(): void
     {
         $order = KitchenOrder::factory()->create();
