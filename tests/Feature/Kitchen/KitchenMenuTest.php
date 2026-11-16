@@ -87,6 +87,36 @@ class KitchenMenuTest extends TestCase
             ->assertJsonPath('data.payment_methods', ['wallet', 'card', 'cash']);
     }
 
+    public function test_menu_items_are_paginated_inside_data(): void
+    {
+        $this->actAsMember();
+        foreach (range(1, 3) as $ignored) {
+            app(StockService::class)->receive(SaleItem::factory()->create()->item, $this->kitchen->asPlace(), 2, 0.5);
+        }
+        // Out of the kitchen store: not served, so not counted in `total`.
+        app(StockService::class)->receive(SaleItem::factory()->create()->item, $this->main->asPlace(), 2, 0.5);
+
+        $url = '/api/v1/member/kitchen/menu?branch_id='.$this->branch->id.'&per_page=2';
+
+        $this->getJson($url)
+            ->assertOk()
+            ->assertJsonCount(2, 'data.items')
+            ->assertJsonPath('data.meta', ['current_page' => 1, 'last_page' => 2, 'per_page' => 2, 'total' => 3])
+            ->assertJsonMissingPath('meta');
+
+        $this->getJson($url.'&page=2')
+            ->assertOk()
+            ->assertJsonCount(1, 'data.items')
+            ->assertJsonPath('data.meta.current_page', 2);
+
+        $this->getJson('/api/v1/member/kitchen/menu?branch_id='.$this->branch->id)
+            ->assertOk()
+            ->assertJsonPath('data.meta.per_page', 15)
+            ->assertJsonCount(3, 'data.items');
+
+        $this->getJson($url.'&per_page=101')->assertUnprocessable();
+    }
+
     public function test_no_kitchen_still_refuses(): void
     {
         $this->actAsMember();

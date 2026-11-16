@@ -14,9 +14,10 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * why not), the bills they could order onto, the route their order takes,
  * how they may pay (and from which wallets), and what the kitchen holds.
  * The place comes from the scan (POST member/scan), not from here. Built from
- * an array: `{access: MenuAccess::for(), items: KitchenMenu::for()}`.
+ * an array: `{access: MenuAccess::for(), items: one page of KitchenMenu::for(),
+ * meta: that page's counters}`.
  *
- * @property array{access: array{branch_id: ?int, can_order: bool, reason: ?string, bills: list<Booking|WalkinSession>, route: string, payment_methods: list<string>, wallets: list<array<string, mixed>>}, items: list<array{sale_item: SaleItem, available: string}>} $resource
+ * @property array{access: array{branch_id: ?int, can_order: bool, reason: ?string, bills: list<Booking|WalkinSession>, route: string, payment_methods: list<string>, wallets: list<array<string, mixed>>}, items: list<array{sale_item: SaleItem, available: string}>, meta: array{current_page: int, last_page: int, per_page: int, total: int}} $resource
  */
 class KitchenMenuResource extends JsonResource
 {
@@ -25,7 +26,7 @@ class KitchenMenuResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        ['access' => $access, 'items' => $items] = $this->resource;
+        ['access' => $access, 'items' => $items, 'meta' => $meta] = $this->resource;
         $branch = $access['branch_id'] === null ? null : Branch::query()->find($access['branch_id']);
 
         return [
@@ -48,6 +49,7 @@ class KitchenMenuResource extends JsonResource
                 // Stock items are counted whole; a fraction left is not one more.
                 'available_quantity' => (int) bcadd($entry['available'], '0', 0),
             ], $items),
+            'meta' => $meta,
         ];
     }
 }

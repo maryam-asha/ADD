@@ -47,18 +47,35 @@ class KitchenController extends Controller
      * ResolveDefaultBranch), else the default branch. No `qr` here: the scan
      * already answered the place, and the QR goes with the order (2026-11-12).
      * Anyone may browse; `can_order` and `reason` say whether they may send.
+     *
+     * `items` is paginated — `?per_page=` (1..100, default 15) and `?page=`
+     * — with its counters in `data.meta`, inside `data` like the rest
+     * of the menu. The page is cut after the stock filter, so `total` counts
+     * only what the kitchen can serve.
      */
     public function menu(Request $request, MenuAccess $access, KitchenMenu $menu): JsonResponse
     {
         $validated = $request->validate([
             'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
         $result = $access->for($request->user(), null, isset($validated['branch_id']) ? (int) $validated['branch_id'] : null);
 
+        $items = $result['branch_id'] === null ? [] : $menu->for($result['branch_id']);
+        $perPage = (int) ($validated['per_page'] ?? 15);
+        $page = (int) ($validated['page'] ?? 1);
+
         return response()->json(['data' => new KitchenMenuResource([
             'access' => $result,
-            'items' => $menu->for($result['branch_id']),
+            'items' => array_slice($items, ($page - 1) * $perPage, $perPage),
+            'meta' => [
+                'current_page' => $page,
+                'last_page' => max(1, (int) ceil(count($items) / $perPage)),
+                'per_page' => $perPage,
+                'total' => count($items),
+            ],
         ])]);
     }
 

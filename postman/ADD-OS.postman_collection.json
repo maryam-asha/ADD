@@ -14663,10 +14663,22 @@
                                             "value": "{{branch_id}}",
                                             "disabled": true,
                                             "description": "Optional. Else the X-Branch-Id header, else the default branch."
+                                        },
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true,
+                                            "description": "Optional. The page of `items`, from 1 (default 1)."
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "disabled": true,
+                                            "description": "Optional. `items` per page, 1..100 (default 15); above 100 is a 422."
                                         }
                                     ]
                                 },
-                                "description": "The branch kitchen's menu, and how this member may order. Anyone may order: `can_order` is false only with `reason: no_kitchen` (the branch has no active kitchen store), else true with `reason` null. (`no_open_session` no longer exists.)\n\nThe branch is the member's first open bill's, else the request's branch (`X-Branch-Id` header or `branch_id`, ResolveDefaultBranch), else the branch of the member's office, else the default branch - never a 422 for a missing branch. `items` are the active sale items with stock in the kitchen store, by name; `available_quantity` is whole units. `bills` are what an order could go on (`type` booking | walkin, as in `coworking-sessions/{type}/{id}`), empty with none.\n\n`route` is `kitchen` (a bill, or office staff) or `reception` (anyone else). `payment_methods` lists what may be sent as `payment.method`: `bill` only with a bill, `wallet` and `card` always, `cash` only on the reception route. `wallets` are the wallets the member may spend from (their own and their companies'), each `{wallet_id, owner_type, owner_id, owner_label, category, category_balance, general_balance, usable_balance}`; send the chosen one as `payment.wallet_owner_type` / `payment.wallet_owner_id` (needed when more than one can pay).\n\n### Cases - see this request's saved examples\n- **With a Bill - Straight to the Kitchen** - 200, `route` kitchen, `bill` offered.\n- **No Bill - Through Reception** - 200, `route` reception, cash offered.\n- **No Kitchen in the Branch** - 200, `can_order` false.\n\nNo `qr` here: the scan (10. Scan) already answers the place, and the QR goes with the order (Send Order). The response has no `place`.",
+                                "description": "The branch kitchen's menu, and how this member may order. Anyone may order: `can_order` is false only with `reason: no_kitchen` (the branch has no active kitchen store), else true with `reason` null. (`no_open_session` no longer exists.)\n\nThe branch is the member's first open bill's, else the request's branch (`X-Branch-Id` header or `branch_id`, ResolveDefaultBranch), else the branch of the member's office, else the default branch - never a 422 for a missing branch. `items` are the active sale items with stock in the kitchen store, by name; `available_quantity` is whole units. `items` come a page at a time: `?per_page=` (1..100, default 15) and `?page=`; the page counters are in `data.meta` (`current_page`, `last_page`, `per_page`, `total`), inside `data` beside `items` like the rest of the menu. The page is cut after the stock filter, so `total` counts only what the kitchen can serve now; every other field of the menu is the same on every page. A `per_page` above 100 or below 1, or a `page` below 1, is a 422. `bills` are what an order could go on (`type` booking | walkin, as in `coworking-sessions/{type}/{id}`), empty with none.\n\n`route` is `kitchen` (a bill, or office staff) or `reception` (anyone else). `payment_methods` lists what may be sent as `payment.method`: `bill` only with a bill, `wallet` and `card` always, `cash` only on the reception route. `wallets` are the wallets the member may spend from (their own and their companies'), each `{wallet_id, owner_type, owner_id, owner_label, category, category_balance, general_balance, usable_balance}`; send the chosen one as `payment.wallet_owner_type` / `payment.wallet_owner_id` (needed when more than one can pay).\n\n### Cases - see this request's saved examples\n- **With a Bill - Straight to the Kitchen** - 200, `route` kitchen, `bill` offered.\n- **No Bill - Through Reception** - 200, `route` reception, cash offered.\n- **No Kitchen in the Branch** - 200, `can_order` false.\n- **Second Page** - 200, `?page=2&per_page=2`: the third item, `meta.current_page` 2.\n- **per_page Above 100** - 422.\n\nNo `qr` here: the scan (10. Scan) already answers the place, and the QR goes with the order (Send Order). The response has no `place`.",
                                 "auth": {
                                     "type": "bearer",
                                     "bearer": [
@@ -14712,10 +14724,22 @@
                                                     "value": "{{branch_id}}",
                                                     "disabled": true,
                                                     "description": "Optional. Else the X-Branch-Id header, else the default branch."
+                                                },
+                                                {
+                                                    "key": "page",
+                                                    "value": "1",
+                                                    "disabled": true,
+                                                    "description": "Optional. The page of `items`, from 1 (default 1)."
+                                                },
+                                                {
+                                                    "key": "per_page",
+                                                    "value": "15",
+                                                    "disabled": true,
+                                                    "description": "Optional. `items` per page, 1..100 (default 15); above 100 is a 422."
                                                 }
                                             ]
                                         },
-                                        "description": "The branch kitchen's menu, and how this member may order. Anyone may order: `can_order` is false only with `reason: no_kitchen` (the branch has no active kitchen store), else true with `reason` null. (`no_open_session` no longer exists.)\n\nThe branch is the member's first open bill's, else the request's branch (`X-Branch-Id` header or `branch_id`, ResolveDefaultBranch), else the branch of the member's office, else the default branch - never a 422 for a missing branch. `items` are the active sale items with stock in the kitchen store, by name; `available_quantity` is whole units. `bills` are what an order could go on (`type` booking | walkin, as in `coworking-sessions/{type}/{id}`), empty with none.\n\n`route` is `kitchen` (a bill, or office staff) or `reception` (anyone else). `payment_methods` lists what may be sent as `payment.method`: `bill` only with a bill, `wallet` and `card` always, `cash` only on the reception route. `wallets` are the wallets the member may spend from (their own and their companies'), each `{wallet_id, owner_type, owner_id, owner_label, category, category_balance, general_balance, usable_balance}`; send the chosen one as `payment.wallet_owner_type` / `payment.wallet_owner_id` (needed when more than one can pay).\n\n### Cases - see this request's saved examples\n- **With a Bill - Straight to the Kitchen** - 200, `route` kitchen, `bill` offered.\n- **No Bill - Through Reception** - 200, `route` reception, cash offered.\n- **No Kitchen in the Branch** - 200, `can_order` false.\n\nNo `qr` here: the scan (10. Scan) already answers the place, and the QR goes with the order (Send Order). The response has no `place`.",
+                                        "description": "The branch kitchen's menu, and how this member may order. Anyone may order: `can_order` is false only with `reason: no_kitchen` (the branch has no active kitchen store), else true with `reason` null. (`no_open_session` no longer exists.)\n\nThe branch is the member's first open bill's, else the request's branch (`X-Branch-Id` header or `branch_id`, ResolveDefaultBranch), else the branch of the member's office, else the default branch - never a 422 for a missing branch. `items` are the active sale items with stock in the kitchen store, by name; `available_quantity` is whole units. `items` come a page at a time: `?per_page=` (1..100, default 15) and `?page=`; the page counters are in `data.meta` (`current_page`, `last_page`, `per_page`, `total`), inside `data` beside `items` like the rest of the menu. The page is cut after the stock filter, so `total` counts only what the kitchen can serve now; every other field of the menu is the same on every page. A `per_page` above 100 or below 1, or a `page` below 1, is a 422. `bills` are what an order could go on (`type` booking | walkin, as in `coworking-sessions/{type}/{id}`), empty with none.\n\n`route` is `kitchen` (a bill, or office staff) or `reception` (anyone else). `payment_methods` lists what may be sent as `payment.method`: `bill` only with a bill, `wallet` and `card` always, `cash` only on the reception route. `wallets` are the wallets the member may spend from (their own and their companies'), each `{wallet_id, owner_type, owner_id, owner_label, category, category_balance, general_balance, usable_balance}`; send the chosen one as `payment.wallet_owner_type` / `payment.wallet_owner_id` (needed when more than one can pay).\n\n### Cases - see this request's saved examples\n- **With a Bill - Straight to the Kitchen** - 200, `route` kitchen, `bill` offered.\n- **No Bill - Through Reception** - 200, `route` reception, cash offered.\n- **No Kitchen in the Branch** - 200, `can_order` false.\n- **Second Page** - 200, `?page=2&per_page=2`: the third item, `meta.current_page` 2.\n- **per_page Above 100** - 422.\n\nNo `qr` here: the scan (10. Scan) already answers the place, and the QR goes with the order (Send Order). The response has no `place`.",
                                         "auth": {
                                             "type": "bearer",
                                             "bearer": [
@@ -14736,7 +14760,7 @@
                                         }
                                     ],
                                     "cookie": [],
-                                    "body": "{\n    \"data\": {\n        \"branch\": {\n            \"id\": 1,\n            \"name\": \"Aleppo Digital District\"\n        },\n        \"can_order\": true,\n        \"reason\": null,\n        \"bills\": [\n            {\n                \"type\": \"walkin\",\n                \"id\": 17,\n                \"label\": \"Co-working Hall\"\n            }\n        ],\n        \"route\": \"kitchen\",\n        \"payment_methods\": [\n            \"bill\",\n            \"wallet\",\n            \"card\"\n        ],\n        \"wallets\": [\n            {\n                \"wallet_id\": 20,\n                \"owner_type\": \"user\",\n                \"owner_id\": 15,\n                \"owner_label\": \"Personal wallet\",\n                \"category\": \"general\",\n                \"category_balance\": 0,\n                \"general_balance\": 900,\n                \"usable_balance\": 900\n            }\n        ],\n        \"items\": [\n            {\n                \"sale_item_id\": 1,\n                \"name\": \"Bottled water\",\n                \"image_url\": null,\n                \"price_points\": 10,\n                \"available_quantity\": 30\n            },\n            {\n                \"sale_item_id\": 3,\n                \"name\": \"Chocolate bar\",\n                \"image_url\": null,\n                \"price_points\": 12,\n                \"available_quantity\": 20\n            }\n        ]\n    }\n}"
+                                    "body": "{\n    \"data\": {\n        \"branch\": {\n            \"id\": 1,\n            \"name\": \"Aleppo Digital District\"\n        },\n        \"can_order\": true,\n        \"reason\": null,\n        \"bills\": [\n            {\n                \"type\": \"walkin\",\n                \"id\": 17,\n                \"label\": \"Co-working Hall\"\n            }\n        ],\n        \"route\": \"kitchen\",\n        \"payment_methods\": [\n            \"bill\",\n            \"wallet\",\n            \"card\"\n        ],\n        \"wallets\": [\n            {\n                \"wallet_id\": 20,\n                \"owner_type\": \"user\",\n                \"owner_id\": 15,\n                \"owner_label\": \"Personal wallet\",\n                \"category\": \"general\",\n                \"category_balance\": 0,\n                \"general_balance\": 900,\n                \"usable_balance\": 900\n            }\n        ],\n        \"items\": [\n            {\n                \"sale_item_id\": 1,\n                \"name\": \"Bottled water\",\n                \"image_url\": null,\n                \"price_points\": 10,\n                \"available_quantity\": 30\n            },\n            {\n                \"sale_item_id\": 3,\n                \"name\": \"Chocolate bar\",\n                \"image_url\": null,\n                \"price_points\": 12,\n                \"available_quantity\": 20\n            }\n        ],\n        \"meta\": {\n            \"current_page\": 1,\n            \"last_page\": 1,\n            \"per_page\": 15,\n            \"total\": 2\n        }\n    }\n}"
                                 },
                                 {
                                     "name": "No Bill - Through Reception",
@@ -14772,10 +14796,22 @@
                                                     "value": "{{branch_id}}",
                                                     "disabled": true,
                                                     "description": "Optional. Else the X-Branch-Id header, else the default branch."
+                                                },
+                                                {
+                                                    "key": "page",
+                                                    "value": "1",
+                                                    "disabled": true,
+                                                    "description": "Optional. The page of `items`, from 1 (default 1)."
+                                                },
+                                                {
+                                                    "key": "per_page",
+                                                    "value": "15",
+                                                    "disabled": true,
+                                                    "description": "Optional. `items` per page, 1..100 (default 15); above 100 is a 422."
                                                 }
                                             ]
                                         },
-                                        "description": "The branch kitchen's menu, and how this member may order. Anyone may order: `can_order` is false only with `reason: no_kitchen` (the branch has no active kitchen store), else true with `reason` null. (`no_open_session` no longer exists.)\n\nThe branch is the member's first open bill's, else the request's branch (`X-Branch-Id` header or `branch_id`, ResolveDefaultBranch), else the branch of the member's office, else the default branch - never a 422 for a missing branch. `items` are the active sale items with stock in the kitchen store, by name; `available_quantity` is whole units. `bills` are what an order could go on (`type` booking | walkin, as in `coworking-sessions/{type}/{id}`), empty with none.\n\n`route` is `kitchen` (a bill, or office staff) or `reception` (anyone else). `payment_methods` lists what may be sent as `payment.method`: `bill` only with a bill, `wallet` and `card` always, `cash` only on the reception route. `wallets` are the wallets the member may spend from (their own and their companies'), each `{wallet_id, owner_type, owner_id, owner_label, category, category_balance, general_balance, usable_balance}`; send the chosen one as `payment.wallet_owner_type` / `payment.wallet_owner_id` (needed when more than one can pay).\n\n### Cases - see this request's saved examples\n- **With a Bill - Straight to the Kitchen** - 200, `route` kitchen, `bill` offered.\n- **No Bill - Through Reception** - 200, `route` reception, cash offered.\n- **No Kitchen in the Branch** - 200, `can_order` false.\n\nNo `qr` here: the scan (10. Scan) already answers the place, and the QR goes with the order (Send Order). The response has no `place`.",
+                                        "description": "The branch kitchen's menu, and how this member may order. Anyone may order: `can_order` is false only with `reason: no_kitchen` (the branch has no active kitchen store), else true with `reason` null. (`no_open_session` no longer exists.)\n\nThe branch is the member's first open bill's, else the request's branch (`X-Branch-Id` header or `branch_id`, ResolveDefaultBranch), else the branch of the member's office, else the default branch - never a 422 for a missing branch. `items` are the active sale items with stock in the kitchen store, by name; `available_quantity` is whole units. `items` come a page at a time: `?per_page=` (1..100, default 15) and `?page=`; the page counters are in `data.meta` (`current_page`, `last_page`, `per_page`, `total`), inside `data` beside `items` like the rest of the menu. The page is cut after the stock filter, so `total` counts only what the kitchen can serve now; every other field of the menu is the same on every page. A `per_page` above 100 or below 1, or a `page` below 1, is a 422. `bills` are what an order could go on (`type` booking | walkin, as in `coworking-sessions/{type}/{id}`), empty with none.\n\n`route` is `kitchen` (a bill, or office staff) or `reception` (anyone else). `payment_methods` lists what may be sent as `payment.method`: `bill` only with a bill, `wallet` and `card` always, `cash` only on the reception route. `wallets` are the wallets the member may spend from (their own and their companies'), each `{wallet_id, owner_type, owner_id, owner_label, category, category_balance, general_balance, usable_balance}`; send the chosen one as `payment.wallet_owner_type` / `payment.wallet_owner_id` (needed when more than one can pay).\n\n### Cases - see this request's saved examples\n- **With a Bill - Straight to the Kitchen** - 200, `route` kitchen, `bill` offered.\n- **No Bill - Through Reception** - 200, `route` reception, cash offered.\n- **No Kitchen in the Branch** - 200, `can_order` false.\n- **Second Page** - 200, `?page=2&per_page=2`: the third item, `meta.current_page` 2.\n- **per_page Above 100** - 422.\n\nNo `qr` here: the scan (10. Scan) already answers the place, and the QR goes with the order (Send Order). The response has no `place`.",
                                         "auth": {
                                             "type": "bearer",
                                             "bearer": [
@@ -14796,7 +14832,7 @@
                                         }
                                     ],
                                     "cookie": [],
-                                    "body": "{\n    \"data\": {\n        \"branch\": {\n            \"id\": 1,\n            \"name\": \"Aleppo Digital District\"\n        },\n        \"can_order\": true,\n        \"reason\": null,\n        \"bills\": [],\n        \"route\": \"reception\",\n        \"payment_methods\": [\n            \"wallet\",\n            \"card\",\n            \"cash\"\n        ],\n        \"wallets\": [\n            {\n                \"wallet_id\": 20,\n                \"owner_type\": \"user\",\n                \"owner_id\": 15,\n                \"owner_label\": \"Personal wallet\",\n                \"category\": \"general\",\n                \"category_balance\": 0,\n                \"general_balance\": 900,\n                \"usable_balance\": 900\n            }\n        ],\n        \"items\": [\n            {\n                \"sale_item_id\": 1,\n                \"name\": \"Bottled water\",\n                \"image_url\": null,\n                \"price_points\": 10,\n                \"available_quantity\": 30\n            },\n            {\n                \"sale_item_id\": 3,\n                \"name\": \"Chocolate bar\",\n                \"image_url\": null,\n                \"price_points\": 12,\n                \"available_quantity\": 20\n            }\n        ]\n    }\n}"
+                                    "body": "{\n    \"data\": {\n        \"branch\": {\n            \"id\": 1,\n            \"name\": \"Aleppo Digital District\"\n        },\n        \"can_order\": true,\n        \"reason\": null,\n        \"bills\": [],\n        \"route\": \"reception\",\n        \"payment_methods\": [\n            \"wallet\",\n            \"card\",\n            \"cash\"\n        ],\n        \"wallets\": [\n            {\n                \"wallet_id\": 20,\n                \"owner_type\": \"user\",\n                \"owner_id\": 15,\n                \"owner_label\": \"Personal wallet\",\n                \"category\": \"general\",\n                \"category_balance\": 0,\n                \"general_balance\": 900,\n                \"usable_balance\": 900\n            }\n        ],\n        \"items\": [\n            {\n                \"sale_item_id\": 1,\n                \"name\": \"Bottled water\",\n                \"image_url\": null,\n                \"price_points\": 10,\n                \"available_quantity\": 30\n            },\n            {\n                \"sale_item_id\": 3,\n                \"name\": \"Chocolate bar\",\n                \"image_url\": null,\n                \"price_points\": 12,\n                \"available_quantity\": 20\n            }\n        ],\n        \"meta\": {\n            \"current_page\": 1,\n            \"last_page\": 1,\n            \"per_page\": 15,\n            \"total\": 2\n        }\n    }\n}"
                                 },
                                 {
                                     "name": "No Kitchen in the Branch",
@@ -14832,10 +14868,22 @@
                                                     "value": "{{branch_id}}",
                                                     "disabled": true,
                                                     "description": "Optional. Else the X-Branch-Id header, else the default branch."
+                                                },
+                                                {
+                                                    "key": "page",
+                                                    "value": "1",
+                                                    "disabled": true,
+                                                    "description": "Optional. The page of `items`, from 1 (default 1)."
+                                                },
+                                                {
+                                                    "key": "per_page",
+                                                    "value": "15",
+                                                    "disabled": true,
+                                                    "description": "Optional. `items` per page, 1..100 (default 15); above 100 is a 422."
                                                 }
                                             ]
                                         },
-                                        "description": "The branch kitchen's menu, and how this member may order. Anyone may order: `can_order` is false only with `reason: no_kitchen` (the branch has no active kitchen store), else true with `reason` null. (`no_open_session` no longer exists.)\n\nThe branch is the member's first open bill's, else the request's branch (`X-Branch-Id` header or `branch_id`, ResolveDefaultBranch), else the branch of the member's office, else the default branch - never a 422 for a missing branch. `items` are the active sale items with stock in the kitchen store, by name; `available_quantity` is whole units. `bills` are what an order could go on (`type` booking | walkin, as in `coworking-sessions/{type}/{id}`), empty with none.\n\n`route` is `kitchen` (a bill, or office staff) or `reception` (anyone else). `payment_methods` lists what may be sent as `payment.method`: `bill` only with a bill, `wallet` and `card` always, `cash` only on the reception route. `wallets` are the wallets the member may spend from (their own and their companies'), each `{wallet_id, owner_type, owner_id, owner_label, category, category_balance, general_balance, usable_balance}`; send the chosen one as `payment.wallet_owner_type` / `payment.wallet_owner_id` (needed when more than one can pay).\n\n### Cases - see this request's saved examples\n- **With a Bill - Straight to the Kitchen** - 200, `route` kitchen, `bill` offered.\n- **No Bill - Through Reception** - 200, `route` reception, cash offered.\n- **No Kitchen in the Branch** - 200, `can_order` false.\n\nNo `qr` here: the scan (10. Scan) already answers the place, and the QR goes with the order (Send Order). The response has no `place`.",
+                                        "description": "The branch kitchen's menu, and how this member may order. Anyone may order: `can_order` is false only with `reason: no_kitchen` (the branch has no active kitchen store), else true with `reason` null. (`no_open_session` no longer exists.)\n\nThe branch is the member's first open bill's, else the request's branch (`X-Branch-Id` header or `branch_id`, ResolveDefaultBranch), else the branch of the member's office, else the default branch - never a 422 for a missing branch. `items` are the active sale items with stock in the kitchen store, by name; `available_quantity` is whole units. `items` come a page at a time: `?per_page=` (1..100, default 15) and `?page=`; the page counters are in `data.meta` (`current_page`, `last_page`, `per_page`, `total`), inside `data` beside `items` like the rest of the menu. The page is cut after the stock filter, so `total` counts only what the kitchen can serve now; every other field of the menu is the same on every page. A `per_page` above 100 or below 1, or a `page` below 1, is a 422. `bills` are what an order could go on (`type` booking | walkin, as in `coworking-sessions/{type}/{id}`), empty with none.\n\n`route` is `kitchen` (a bill, or office staff) or `reception` (anyone else). `payment_methods` lists what may be sent as `payment.method`: `bill` only with a bill, `wallet` and `card` always, `cash` only on the reception route. `wallets` are the wallets the member may spend from (their own and their companies'), each `{wallet_id, owner_type, owner_id, owner_label, category, category_balance, general_balance, usable_balance}`; send the chosen one as `payment.wallet_owner_type` / `payment.wallet_owner_id` (needed when more than one can pay).\n\n### Cases - see this request's saved examples\n- **With a Bill - Straight to the Kitchen** - 200, `route` kitchen, `bill` offered.\n- **No Bill - Through Reception** - 200, `route` reception, cash offered.\n- **No Kitchen in the Branch** - 200, `can_order` false.\n- **Second Page** - 200, `?page=2&per_page=2`: the third item, `meta.current_page` 2.\n- **per_page Above 100** - 422.\n\nNo `qr` here: the scan (10. Scan) already answers the place, and the QR goes with the order (Send Order). The response has no `place`.",
                                         "auth": {
                                             "type": "bearer",
                                             "bearer": [
@@ -14856,7 +14904,151 @@
                                         }
                                     ],
                                     "cookie": [],
-                                    "body": "{\n    \"data\": {\n        \"branch\": {\n            \"id\": 1,\n            \"name\": \"Aleppo Digital District\"\n        },\n        \"can_order\": false,\n        \"reason\": \"no_kitchen\",\n        \"bills\": [],\n        \"route\": \"reception\",\n        \"payment_methods\": [\n            \"wallet\",\n            \"card\",\n            \"cash\"\n        ],\n        \"wallets\": [\n            {\n                \"wallet_id\": 20,\n                \"owner_type\": \"user\",\n                \"owner_id\": 15,\n                \"owner_label\": \"Personal wallet\",\n                \"category\": \"general\",\n                \"category_balance\": 0,\n                \"general_balance\": 900,\n                \"usable_balance\": 900\n            }\n        ],\n        \"items\": []\n    }\n}"
+                                    "body": "{\n    \"data\": {\n        \"branch\": {\n            \"id\": 1,\n            \"name\": \"Aleppo Digital District\"\n        },\n        \"can_order\": false,\n        \"reason\": \"no_kitchen\",\n        \"bills\": [],\n        \"route\": \"reception\",\n        \"payment_methods\": [\n            \"wallet\",\n            \"card\",\n            \"cash\"\n        ],\n        \"wallets\": [\n            {\n                \"wallet_id\": 20,\n                \"owner_type\": \"user\",\n                \"owner_id\": 15,\n                \"owner_label\": \"Personal wallet\",\n                \"category\": \"general\",\n                \"category_balance\": 0,\n                \"general_balance\": 900,\n                \"usable_balance\": 900\n            }\n        ],\n        \"items\": [],\n        \"meta\": {\n            \"current_page\": 1,\n            \"last_page\": 1,\n            \"per_page\": 15,\n            \"total\": 0\n        }\n    }\n}"
+                                },
+                                {
+                                    "name": "Second Page",
+                                    "originalRequest": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/kitchen/menu?page=2&per_page=2",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "kitchen",
+                                                "menu"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "branch_id",
+                                                    "value": "{{branch_id}}",
+                                                    "disabled": true,
+                                                    "description": "Optional. Else the X-Branch-Id header, else the default branch."
+                                                },
+                                                {
+                                                    "key": "page",
+                                                    "value": "2",
+                                                    "disabled": false,
+                                                    "description": "Optional. The page of `items`, from 1 (default 1)."
+                                                },
+                                                {
+                                                    "key": "per_page",
+                                                    "value": "2",
+                                                    "disabled": false,
+                                                    "description": "Optional. `items` per page, 1..100 (default 15); above 100 is a 422."
+                                                }
+                                            ]
+                                        },
+                                        "description": "The branch kitchen's menu, and how this member may order. Anyone may order: `can_order` is false only with `reason: no_kitchen` (the branch has no active kitchen store), else true with `reason` null. (`no_open_session` no longer exists.)\n\nThe branch is the member's first open bill's, else the request's branch (`X-Branch-Id` header or `branch_id`, ResolveDefaultBranch), else the branch of the member's office, else the default branch - never a 422 for a missing branch. `items` are the active sale items with stock in the kitchen store, by name; `available_quantity` is whole units. `items` come a page at a time: `?per_page=` (1..100, default 15) and `?page=`; the page counters are in `data.meta` (`current_page`, `last_page`, `per_page`, `total`), inside `data` beside `items` like the rest of the menu. The page is cut after the stock filter, so `total` counts only what the kitchen can serve now; every other field of the menu is the same on every page. A `per_page` above 100 or below 1, or a `page` below 1, is a 422. `bills` are what an order could go on (`type` booking | walkin, as in `coworking-sessions/{type}/{id}`), empty with none.\n\n`route` is `kitchen` (a bill, or office staff) or `reception` (anyone else). `payment_methods` lists what may be sent as `payment.method`: `bill` only with a bill, `wallet` and `card` always, `cash` only on the reception route. `wallets` are the wallets the member may spend from (their own and their companies'), each `{wallet_id, owner_type, owner_id, owner_label, category, category_balance, general_balance, usable_balance}`; send the chosen one as `payment.wallet_owner_type` / `payment.wallet_owner_id` (needed when more than one can pay).\n\n### Cases - see this request's saved examples\n- **With a Bill - Straight to the Kitchen** - 200, `route` kitchen, `bill` offered.\n- **No Bill - Through Reception** - 200, `route` reception, cash offered.\n- **No Kitchen in the Branch** - 200, `can_order` false.\n- **Second Page** - 200, `?page=2&per_page=2`: the third item, `meta.current_page` 2.\n- **per_page Above 100** - 422.\n\nNo `qr` here: the scan (10. Scan) already answers the place, and the QR goes with the order (Send Order). The response has no `place`.",
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": {\n        \"branch\": {\n            \"id\": 1,\n            \"name\": \"Aleppo Digital District\"\n        },\n        \"can_order\": true,\n        \"reason\": null,\n        \"bills\": [],\n        \"route\": \"reception\",\n        \"payment_methods\": [\n            \"wallet\",\n            \"card\",\n            \"cash\"\n        ],\n        \"wallets\": [\n            {\n                \"wallet_id\": 20,\n                \"owner_type\": \"user\",\n                \"owner_id\": 15,\n                \"owner_label\": \"Personal wallet\",\n                \"category\": \"general\",\n                \"category_balance\": 0,\n                \"general_balance\": 900,\n                \"usable_balance\": 900\n            }\n        ],\n        \"items\": [\n            {\n                \"sale_item_id\": 5,\n                \"name\": \"Orange juice\",\n                \"image_url\": null,\n                \"price_points\": 15,\n                \"available_quantity\": 8\n            }\n        ],\n        \"meta\": {\n            \"current_page\": 2,\n            \"last_page\": 2,\n            \"per_page\": 2,\n            \"total\": 3\n        }\n    }\n}"
+                                },
+                                {
+                                    "name": "per_page Above 100",
+                                    "originalRequest": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/kitchen/menu?per_page=101",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "kitchen",
+                                                "menu"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "branch_id",
+                                                    "value": "{{branch_id}}",
+                                                    "disabled": true,
+                                                    "description": "Optional. Else the X-Branch-Id header, else the default branch."
+                                                },
+                                                {
+                                                    "key": "page",
+                                                    "value": "1",
+                                                    "disabled": true,
+                                                    "description": "Optional. The page of `items`, from 1 (default 1)."
+                                                },
+                                                {
+                                                    "key": "per_page",
+                                                    "value": "101",
+                                                    "disabled": false,
+                                                    "description": "Optional. `items` per page, 1..100 (default 15); above 100 is a 422."
+                                                }
+                                            ]
+                                        },
+                                        "description": "The branch kitchen's menu, and how this member may order. Anyone may order: `can_order` is false only with `reason: no_kitchen` (the branch has no active kitchen store), else true with `reason` null. (`no_open_session` no longer exists.)\n\nThe branch is the member's first open bill's, else the request's branch (`X-Branch-Id` header or `branch_id`, ResolveDefaultBranch), else the branch of the member's office, else the default branch - never a 422 for a missing branch. `items` are the active sale items with stock in the kitchen store, by name; `available_quantity` is whole units. `items` come a page at a time: `?per_page=` (1..100, default 15) and `?page=`; the page counters are in `data.meta` (`current_page`, `last_page`, `per_page`, `total`), inside `data` beside `items` like the rest of the menu. The page is cut after the stock filter, so `total` counts only what the kitchen can serve now; every other field of the menu is the same on every page. A `per_page` above 100 or below 1, or a `page` below 1, is a 422. `bills` are what an order could go on (`type` booking | walkin, as in `coworking-sessions/{type}/{id}`), empty with none.\n\n`route` is `kitchen` (a bill, or office staff) or `reception` (anyone else). `payment_methods` lists what may be sent as `payment.method`: `bill` only with a bill, `wallet` and `card` always, `cash` only on the reception route. `wallets` are the wallets the member may spend from (their own and their companies'), each `{wallet_id, owner_type, owner_id, owner_label, category, category_balance, general_balance, usable_balance}`; send the chosen one as `payment.wallet_owner_type` / `payment.wallet_owner_id` (needed when more than one can pay).\n\n### Cases - see this request's saved examples\n- **With a Bill - Straight to the Kitchen** - 200, `route` kitchen, `bill` offered.\n- **No Bill - Through Reception** - 200, `route` reception, cash offered.\n- **No Kitchen in the Branch** - 200, `can_order` false.\n- **Second Page** - 200, `?page=2&per_page=2`: the third item, `meta.current_page` 2.\n- **per_page Above 100** - 422.\n\nNo `qr` here: the scan (10. Scan) already answers the place, and the QR goes with the order (Send Order). The response has no `place`.",
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "status": "Unprocessable Content",
+                                    "code": 422,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"The per page field must not be greater than 100.\",\n    \"errors\": {\n        \"per_page\": [\n            \"The per page field must not be greater than 100.\"\n        ]\n    }\n}"
                                 }
                             ]
                         },
