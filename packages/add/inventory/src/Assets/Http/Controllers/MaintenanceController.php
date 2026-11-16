@@ -9,6 +9,7 @@ use Add\Inventory\Assets\Models\Asset;
 use Add\Inventory\Assets\Models\MaintenanceRecord;
 use Add\Inventory\Assets\Models\MaintenanceSchedule;
 use Add\Inventory\Assets\Services\MaintenanceService;
+use Add\Inventory\Support\Http\PlaceFilter;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -19,7 +20,10 @@ use Illuminate\Routing\Controller;
 class MaintenanceController extends Controller
 {
     /**
-     * Filters: `asset_id`, `open` (only what is still being worked on).
+     * Filters: `asset_id`, `open` (only what is still being worked on),
+     * `place[type]` + `place[id]` (where the asset sits, anywhere inside),
+     * `category_id`, `type`, `from` / `to` (days, on when it was opened),
+     * `search` (the asset's code or serial, the description, the vendor).
      */
     public function index(Request $request): AnonymousResourceCollection
     {
@@ -27,6 +31,17 @@ class MaintenanceController extends Controller
             ->with('asset.item')
             ->when($request->filled('asset_id'), fn (Builder $query) => $query->where('asset_id', $request->integer('asset_id')))
             ->when($request->boolean('open'), fn (Builder $query) => $query->whereNull('closed_at'))
+            ->tap(fn (Builder $query) => PlaceFilter::throughAsset($query, $request))
+            ->when(MaintenanceType::tryFrom((string) $request->input('type')), fn (Builder $query, MaintenanceType $type) => $query->where('type', $type))
+            ->when($request->filled('from'), fn (Builder $query) => $query->where('opened_at', '>=', $request->date('from')->startOfDay()))
+            ->when($request->filled('to'), fn (Builder $query) => $query->where('opened_at', '<=', $request->date('to')->endOfDay()))
+            ->when($request->filled('search'), function (Builder $query) use ($request) {
+                $needle = (string) $request->string('search');
+                $query->where(fn (Builder $q) => $q
+                    ->where('description', 'like', '%'.$needle.'%')
+                    ->orWhere('vendor', 'like', '%'.$needle.'%')
+                    ->orWhereHas('asset', fn (Builder $asset) => PlaceFilter::assetsMatching($asset, $needle)));
+            })
             ->orderByDesc('opened_at')
             ->orderByDesc('id')
             ->paginate(min(100, max(1, $request->integer('per_page', 25))));

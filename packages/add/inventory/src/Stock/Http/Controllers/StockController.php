@@ -37,16 +37,7 @@ class StockController extends Controller
             ->with('item.unit')
             ->where('location_type', Warehouse::TYPE)
             ->when($request->filled('item_id'), fn (Builder $query) => $query->where('item_id', $request->integer('item_id')))
-            ->when($request->filled('search'), function (Builder $query) use ($request) {
-                $needle = '%'.$request->string('search').'%';
-                $query->whereIn('item_id', Item::query()->select('id')->where(
-                    fn (Builder $q) => $q->where('sku', 'like', $needle)->orWhere('barcode', 'like', $needle)->orWhere('name', 'like', $needle),
-                ));
-            })
-            ->when($request->filled('category_id'), function (Builder $query) use ($request) {
-                $category = Category::query()->find($request->integer('category_id'));
-                $query->whereIn('item_id', Item::query()->select('id')->whereIn('category_id', $category?->subtreeIds() ?? []));
-            })
+            ->tap(fn (Builder $query) => $this->byItem($query, $request))
             ->when(Warehouse::idsFromFilter($request->all()), fn (Builder $query, array $ids) => $query->whereIn('location_id', $ids), fn (Builder $query) => $this->unlessFilteredToNone($query, $request))
             ->when(! $request->boolean('include_empty'), fn (Builder $query) => $query->where('quantity', '>', 0))
             ->orderBy('item_id')
@@ -59,7 +50,8 @@ class StockController extends Controller
     /**
      * The ledger, newest first. Filters: `item_id`, `warehouse_id` or
      * `place`, `type`, `actor_id`, `operation_id`, `source[type]` +
-     * `source[id]`, `from` / `to` (days).
+     * `source[id]`, `from` / `to` (days), `category_id` (and the categories
+     * below it), `search` (the item's SKU, barcode or name).
      */
     public function movements(Request $request): AnonymousResourceCollection
     {
@@ -69,6 +61,7 @@ class StockController extends Controller
             ->with(['item', 'enteredUnit'])
             ->where('location_type', Warehouse::TYPE)
             ->when($request->filled('item_id'), fn (Builder $query) => $query->where('item_id', $request->integer('item_id')))
+            ->tap(fn (Builder $query) => $this->byItem($query, $request))
             ->when(Warehouse::idsFromFilter($request->all()), fn (Builder $query, array $ids) => $query->whereIn('location_id', $ids), fn (Builder $query) => $this->unlessFilteredToNone($query, $request))
             ->when(StockMovementType::tryFrom((string) $request->input('type')), fn (Builder $query, StockMovementType $type) => $query->where('type', $type))
             ->when($request->filled('actor_id'), fn (Builder $query) => $query->where('actor_id', $request->integer('actor_id')))
@@ -88,17 +81,18 @@ class StockController extends Controller
 
     /**
      * Operations as staff recorded them, the latest day first. Filters:
-     * `warehouse_id` (from or to), `kind`, `actor_id`, `from` / `to` (on
-     * the operation's date).
+     * `warehouse_id` (from or to) or `place[type]` + `place[id]` (from or
+     * to a warehouse anywhere inside it), `kind`, `actor_id`, `from` / `to`
+     * (on the operation's date).
      */
     public function operations(Request $request): AnonymousResourceCollection
     {
         $operations = StockOperation::query()
             // A transfer's two halves are one line of the operation.
             ->withCount(['movements as lines_count' => fn (Builder $query) => $query->where('type', '!=', StockMovementType::TransferIn)])
-            ->when($request->filled('warehouse_id'), fn (Builder $query) => $query->where(
-                fn (Builder $q) => $q->where('warehouse_id', $request->integer('warehouse_id'))->orWhere('to_warehouse_id', $request->integer('warehouse_id')),
-            ))
+            ->when(Warehouse::idsFromFilter($request->all()), fn (Builder $query, array $ids) => $query->where(
+                fn (Builder $q) => $q->whereIn('warehouse_id', $ids)->orWhereIn('to_warehouse_id', $ids),
+            ), fn (Builder $query) => $this->unlessFilteredToNone($query, $request))
             ->when(OperationKind::tryFrom((string) $request->input('kind')), fn (Builder $query, OperationKind $kind) => $query->where('kind', $kind))
             ->when($request->filled('actor_id'), fn (Builder $query) => $query->where('actor_id', $request->integer('actor_id')))
             ->when($request->filled('from'), fn (Builder $query) => $query->where('operation_date', '>=', $request->date('from')->toDateString()))
@@ -145,6 +139,25 @@ class StockController extends Controller
         return $operation === null
             ? response()->json(['message' => __('inventory::stock.count_matched')])
             : $this->operation($operation)->response()->setStatusCode(201);
+    }
+
+    /**
+     * Rows of an item matching `search` (SKU, barcode or name) or within
+     * `category_id` and the categories below it.
+     */
+    private function byItem(Builder $query, Request $request): Builder
+    {
+        return $query
+            ->when($request->filled('search'), function (Builder $query) use ($request) {
+                $needle = '%'.$request->string('search').'%';
+                $query->whereIn('item_id', Item::query()->select('id')->where(
+                    fn (Builder $q) => $q->where('sku', 'like', $needle)->orWhere('barcode', 'like', $needle)->orWhere('name', 'like', $needle),
+                ));
+            })
+            ->when($request->filled('category_id'), function (Builder $query) use ($request) {
+                $category = Category::query()->find($request->integer('category_id'));
+                $query->whereIn('item_id', Item::query()->select('id')->whereIn('category_id', $category?->subtreeIds() ?? []));
+            });
     }
 
     /**

@@ -35,12 +35,14 @@ class AssetService
     /**
      * `$count` identical assets of one item at one place (five chairs
      * bought together), each with its own code and QR. A given `code` is
-     * only for a single asset.
+     * only for a single asset. `$serials` gives the units their serials,
+     * the first to the first made; a blank one is not known yet.
      *
      * @param  array<string, mixed>  $details
+     * @param  list<string|null>  $serials
      * @return Collection<int, Asset>
      */
-    public function register(Item $item, ?Place $location, array $details = [], int $count = 1, bool $draft = false): Collection
+    public function register(Item $item, ?Place $location, array $details = [], int $count = 1, bool $draft = false, array $serials = []): Collection
     {
         if (! $item->isAsset()) {
             InventoryException::fail('inventory::assets.not_asset');
@@ -69,12 +71,19 @@ class AssetService
             $this->ensureLocation($location ?? InventoryException::fail('inventory::assets.unknown_location'), $item);
         }
 
-        return DB::transaction(function () use ($item, $location, $details, $count, $draft) {
+        if (count($serials) > $count) {
+            InventoryException::fail('inventory::assets.serials_over_count', ['max' => $count]);
+        }
+
+        $serials = array_values($serials);
+
+        return DB::transaction(function () use ($item, $location, $details, $count, $draft, $serials) {
             $assets = collect();
 
             for ($i = 0; $i < $count; $i++) {
                 $asset = Asset::query()->create([
                     ...$details,
+                    ...($serials === [] ? [] : ['serial_number' => is_string($serials[$i] ?? null) && trim($serials[$i]) !== '' ? trim($serials[$i]) : null]),
                     'item_id' => $item->id,
                     'qr_token' => Str::random(40),
                     'status' => $draft ? AssetStatus::Draft : AssetStatus::InService,
@@ -95,10 +104,11 @@ class AssetService
 
     /**
      * Several asset items put in one place together, all or none: each line
-     * is `['item' => Item, 'count' => int, 'details' => [...]]`, and what the
-     * purchase shares is laid under every line's own details.
+     * is `['item' => Item, 'count' => int, 'details' => [...], 'serials' =>
+     * [...]?]`, and what the purchase shares is laid under every line's own
+     * details.
      *
-     * @param  list<array{item: Item, count: int, details: array<string, mixed>}>  $lines
+     * @param  list<array{item: Item, count: int, details: array<string, mixed>, serials?: list<string|null>}>  $lines
      * @param  array<string, mixed>  $shared
      * @return Collection<int, Asset>
      */
@@ -106,7 +116,7 @@ class AssetService
     {
         // An intangible line sits nowhere; every other one at the place.
         return DB::transaction(fn () => collect($lines)->flatMap(
-            fn (array $line) => $this->register($line['item'], $line['item']->isIntangible() ? null : $location, [...$shared, ...$line['details']], $line['count'], $draft)
+            fn (array $line) => $this->register($line['item'], $line['item']->isIntangible() ? null : $location, [...$shared, ...$line['details']], $line['count'], $draft, $line['serials'] ?? [])
         )->values());
     }
 

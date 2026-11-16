@@ -7,6 +7,8 @@ use Add\Inventory\Assets\Models\Asset;
 use Add\Inventory\Assets\Services\DepreciationCalculator;
 use Add\Inventory\Stock\Models\StockBalance;
 use Add\Inventory\Support\Decimal;
+use Add\Inventory\Support\Http\PlaceFilter;
+use Add\Inventory\Support\Place;
 use Add\Inventory\Support\Presenter;
 use Add\Inventory\Warehouses\Models\Warehouse;
 use Illuminate\Database\Eloquent\Builder;
@@ -52,7 +54,8 @@ class ReportController extends Controller
     /**
      * Every asset still owned, with what it cost and what it is worth on
      * the books today, totalled per currency. `include_disposed=1` adds the
-     * ones disposed of.
+     * ones disposed of; `place[type]` + `place[id]` (anywhere inside) and
+     * `category_id` (with every category below it) narrow it.
      */
     public function assetRegister(Request $request, DepreciationCalculator $depreciation, Presenter $presenter): JsonResponse
     {
@@ -60,6 +63,8 @@ class ReportController extends Controller
             ->with(['item.category', 'additions'])
             ->where('status', '!=', AssetStatus::Draft)
             ->when(! $request->boolean('include_disposed'), fn (Builder $query) => $query->where('status', '!=', AssetStatus::Disposed))
+            ->when(PlaceFilter::from($request), fn (Builder $query, Place $place) => PlaceFilter::assetsWithin($query, $place))
+            ->when($request->filled('category_id'), fn (Builder $query) => PlaceFilter::assetsInCategory($query, $request->integer('category_id')))
             ->orderBy('id')
             ->get();
 

@@ -37,6 +37,8 @@ class RegisterAssetRequest extends FormRequest
             'count' => ['sometimes', 'integer', 'min:1', 'max:'.config('inventory.assets.max_batch')],
             'code' => ['nullable', 'string', 'max:40', Rule::unique('inv_assets', 'code')],
             ...$this->detailRules(),
+            // With `count`: one per unit, in the order they are made.
+            ...$this->serialRules(),
             ...$this->draftRules(),
         ];
     }

@@ -53588,6 +53588,36 @@
                                         {
                                             "key": "status",
                                             "value": ""
+                                        },
+                                        {
+                                            "key": "item_id",
+                                            "value": "",
+                                            "disabled": true,
+                                            "description": "One asset item"
+                                        },
+                                        {
+                                            "key": "category_id",
+                                            "value": "",
+                                            "disabled": true,
+                                            "description": "A category and every category below it"
+                                        },
+                                        {
+                                            "key": "custodian[type]",
+                                            "value": "",
+                                            "disabled": true,
+                                            "description": "hr_employee, member or company"
+                                        },
+                                        {
+                                            "key": "custodian[id]",
+                                            "value": "",
+                                            "disabled": true,
+                                            "description": "The custodian's id"
+                                        },
+                                        {
+                                            "key": "search",
+                                            "value": "",
+                                            "disabled": true,
+                                            "description": "Code or serial number"
                                         }
                                     ]
                                 },
@@ -53630,7 +53660,7 @@
                                 "description": "`count` identical assets of an asset item at one place, each with its own code and QR (a given `code` only for one). A cost needs its `currency`; salvage cannot exceed cost. Answers the list (201).",
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n  \"item_id\": 4,\n  \"location\": {\n    \"type\": \"space\",\n    \"id\": 7\n  },\n  \"count\": 2,\n  \"serial_number\": null,\n  \"purchased_on\": \"2026-10-01\",\n  \"purchase_cost\": 450,\n  \"currency\": \"USD\",\n  \"supplier\": \"Tech Co\",\n  \"useful_life_months\": 36,\n  \"salvage_value\": 50,\n  \"warranty_until\": \"2027-10-01\",\n  \"notes\": null\n}",
+                                    "raw": "{\n  \"item_id\": 4,\n  \"location\": {\n    \"type\": \"space\",\n    \"id\": 7\n  },\n  \"count\": 2,\n  \"serial_numbers\": [\"SN-001\", null],\n  \"purchased_on\": \"2026-10-01\",\n  \"purchase_cost\": 450,\n  \"currency\": \"USD\",\n  \"supplier\": \"Tech Co\",\n  \"useful_life_months\": 36,\n  \"salvage_value\": 50,\n  \"warranty_until\": \"2027-10-01\",\n  \"notes\": null\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -54024,10 +54054,34 @@
                                         {
                                             "key": "open",
                                             "value": "1"
+                                        },
+                                        {
+                                            "key": "place[type]",
+                                            "value": "",
+                                            "disabled": true,
+                                            "description": "Where the asset sits: branch, building, floor, zone or space — anywhere inside it"
+                                        },
+                                        {
+                                            "key": "place[id]",
+                                            "value": "",
+                                            "disabled": true,
+                                            "description": "The place's id"
+                                        },
+                                        {
+                                            "key": "category_id",
+                                            "value": "",
+                                            "disabled": true,
+                                            "description": "A category and every category below it"
+                                        },
+                                        {
+                                            "key": "search",
+                                            "value": "",
+                                            "disabled": true,
+                                            "description": "The asset's code or serial number"
                                         }
                                     ]
                                 },
-                                "description": "What someone holds (an employee leaving hands back everything listed). `open=0` adds what was returned."
+                                "description": "What someone holds (an employee leaving hands back everything listed). `open=0` adds what was returned. Also `place[type]` + `place[id]` (where the asset sits, anywhere inside), `category_id`, `search` (code or serial)."
                             }
                         }
                     ]
@@ -54067,10 +54121,52 @@
                                         {
                                             "key": "open",
                                             "value": "1"
+                                        },
+                                        {
+                                            "key": "place[type]",
+                                            "value": "",
+                                            "disabled": true,
+                                            "description": "Where the asset sits: branch, building, floor, zone or space — anywhere inside it"
+                                        },
+                                        {
+                                            "key": "place[id]",
+                                            "value": "",
+                                            "disabled": true,
+                                            "description": "The place's id"
+                                        },
+                                        {
+                                            "key": "category_id",
+                                            "value": "",
+                                            "disabled": true,
+                                            "description": "A category and every category below it"
+                                        },
+                                        {
+                                            "key": "type",
+                                            "value": "",
+                                            "disabled": true,
+                                            "description": "preventive or corrective"
+                                        },
+                                        {
+                                            "key": "from",
+                                            "value": "",
+                                            "disabled": true,
+                                            "description": "Opened on or after (Y-m-d)"
+                                        },
+                                        {
+                                            "key": "to",
+                                            "value": "",
+                                            "disabled": true,
+                                            "description": "Opened on or before (Y-m-d)"
+                                        },
+                                        {
+                                            "key": "search",
+                                            "value": "",
+                                            "disabled": true,
+                                            "description": "The asset's code or serial, the description or the vendor"
                                         }
                                     ]
                                 },
-                                "description": "Newest first. Filters: `asset_id`, `open=1`."
+                                "description": "Newest first. Filters: `asset_id`, `open=1`. Also `place[type]` + `place[id]`, `category_id`, `type`, `from` / `to` (opened), `search`."
                             }
                         },
                         {
@@ -54232,10 +54328,22 @@
                                         {
                                             "key": "days",
                                             "value": "7"
+                                        },
+                                        {
+                                            "key": "place[type]",
+                                            "value": "",
+                                            "disabled": true,
+                                            "description": "Where the asset sits: branch, building, floor, zone or space — anywhere inside it"
+                                        },
+                                        {
+                                            "key": "place[id]",
+                                            "value": "",
+                                            "disabled": true,
+                                            "description": "The place's id"
                                         }
                                     ]
                                 },
-                                "description": "Everything due within `days` (default: the lead time), overdue first."
+                                "description": "Everything due within `days` (default: the lead time), overdue first. `place[type]` + `place[id]` narrows to assets anywhere inside that place."
                             }
                         },
                         {
@@ -54447,10 +54555,34 @@
                                         {
                                             "key": "type",
                                             "value": ""
+                                        },
+                                        {
+                                            "key": "place[type]",
+                                            "value": "",
+                                            "disabled": true,
+                                            "description": "Warehouses anywhere inside this place (e.g. a branch)"
+                                        },
+                                        {
+                                            "key": "place[id]",
+                                            "value": "",
+                                            "disabled": true,
+                                            "description": "The place's id"
+                                        },
+                                        {
+                                            "key": "category_id",
+                                            "value": "",
+                                            "disabled": true,
+                                            "description": "A category and every category below it"
+                                        },
+                                        {
+                                            "key": "search",
+                                            "value": "",
+                                            "disabled": true,
+                                            "description": "The item's SKU, barcode or name"
                                         }
                                     ]
                                 },
-                                "description": "The ledger, newest first. Filters: `item_id`, `location` (+ `within`), `type`, `source[type]`+`source[id]` (item_sale, resource_consumption), `from`, `to`."
+                                "description": "The ledger, newest first. Filters: `item_id`, `location` (+ `within`), `type`, `source[type]`+`source[id]` (item_sale, resource_consumption), `from`, `to`. Also `place[type]` + `place[id]`, `category_id`, `search` (SKU, barcode or name)."
                             }
                         },
                         {
@@ -54717,10 +54849,28 @@
                                         {
                                             "key": "include_disposed",
                                             "value": "0"
+                                        },
+                                        {
+                                            "key": "place[type]",
+                                            "value": "",
+                                            "disabled": true,
+                                            "description": "Where the asset sits: branch, building, floor, zone or space — anywhere inside it"
+                                        },
+                                        {
+                                            "key": "place[id]",
+                                            "value": "",
+                                            "disabled": true,
+                                            "description": "The place's id"
+                                        },
+                                        {
+                                            "key": "category_id",
+                                            "value": "",
+                                            "disabled": true,
+                                            "description": "A category and every category below it"
                                         }
                                     ]
                                 },
-                                "description": "Every asset still owned with cost, accumulated depreciation and book value, totalled per currency. `include_disposed=1` adds the rest."
+                                "description": "Every asset still owned with cost, accumulated depreciation and book value, totalled per currency. `include_disposed=1` adds the rest. `place[type]` + `place[id]` (anywhere inside) and `category_id` narrow it."
                             }
                         }
                     ]

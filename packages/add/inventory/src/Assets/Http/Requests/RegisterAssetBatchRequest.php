@@ -22,6 +22,7 @@ use Illuminate\Validation\Rule;
 class RegisterAssetBatchRequest extends FormRequest
 {
     use DecidesDraft;
+    use ValidatesSerials;
 
     /**
      * @return array<string, mixed>
@@ -45,6 +46,8 @@ class RegisterAssetBatchRequest extends FormRequest
             'lines.*.item_id' => ['required', 'integer', Rule::exists('inv_items', 'id')],
             'lines.*.count' => ['sometimes', 'integer', 'min:1', 'max:'.config('inventory.assets.max_batch')],
             'lines.*.serial_number' => ['nullable', 'string', 'max:100'],
+            // One per unit, in the order the line's units are made.
+            ...$this->serialRules('lines.*.'),
             'lines.*.purchase_cost' => ['nullable', 'numeric', 'min:0', 'max:999999999999'],
             'lines.*.depreciation_method' => ['nullable', Rule::in(DepreciationMethod::enabledValues())],
             'lines.*.useful_life_months' => ['nullable', 'integer', 'min:1', 'max:1200'],
@@ -107,6 +110,10 @@ class RegisterAssetBatchRequest extends FormRequest
                     $validator->errors()->add("lines.{$i}.serial_number", __('inventory::assets.serial_for_one'));
                 }
 
+                if (filled($line['serial_number'] ?? null) && ($line['serial_numbers'] ?? null) !== null) {
+                    $validator->errors()->add("lines.{$i}.serial_numbers", __('inventory::assets.serial_or_serials'));
+                }
+
                 $cost = $line['purchase_cost'] ?? null;
                 $salvage = $line['salvage_value'] ?? null;
 
@@ -114,6 +121,13 @@ class RegisterAssetBatchRequest extends FormRequest
                     $validator->errors()->add("lines.{$i}.salvage_value", __('inventory::assets.salvage_over_cost'));
                 }
             }
+
+            $this->checkSerials($validator, array_values(array_filter(array_map(fn ($line, $i) => match (true) {
+                ! is_array($line) => null,
+                ($line['serial_numbers'] ?? null) !== null => ['key' => "lines.{$i}.serial_numbers", 'item_id' => $line['item_id'] ?? null, 'count' => (int) ($line['count'] ?? 1), 'serials' => $line['serial_numbers']],
+                filled($line['serial_number'] ?? null) => ['key' => "lines.{$i}.serial_number", 'item_id' => $line['item_id'] ?? null, 'count' => 1, 'serials' => [$line['serial_number']]],
+                default => null,
+            }, $lines, array_keys($lines)))));
         });
     }
 }

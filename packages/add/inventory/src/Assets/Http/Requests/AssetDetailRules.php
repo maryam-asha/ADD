@@ -17,6 +17,8 @@ use Illuminate\Validation\Rule;
  */
 trait AssetDetailRules
 {
+    use ValidatesSerials;
+
     /**
      * @return array<string, list<mixed>>
      */
@@ -66,6 +68,51 @@ trait AssetDetailRules
             if (is_string($purchased) && is_string($inService) && $inService < $purchased && ! $validator->errors()->has('in_service_on')) {
                 $validator->errors()->add('in_service_on', __('inventory::assets.in_service_before_purchase'));
             }
+
+            $this->checkDetailSerials($validator, $asset);
         });
+    }
+
+    /**
+     * Registering: one serial, or a serial per unit — never both, and one
+     * serial only for a single asset. Editing: its own serial is not a
+     * duplicate of itself.
+     */
+    private function checkDetailSerials(Validator $validator, ?Asset $asset): void
+    {
+        $single = $this->input('serial_number');
+
+        if ($asset !== null) {
+            // Only a changed serial is checked: one shared before serials were
+            // checked must not block every later edit of the asset.
+            $unchanged = is_string($single) && mb_strtolower(trim($single)) === mb_strtolower(trim((string) $asset->serial_number));
+
+            if (filled($single) && ! $unchanged) {
+                $this->checkSerials($validator, [['key' => 'serial_number', 'item_id' => $asset->item_id, 'count' => 1, 'serials' => [$single], 'ignore' => $asset->id]]);
+            }
+
+            return;
+        }
+
+        $count = (int) $this->input('count', 1);
+        $serials = $this->input('serial_numbers');
+
+        if (filled($single) && $serials !== null) {
+            $validator->errors()->add('serial_numbers', __('inventory::assets.serial_or_serials'));
+
+            return;
+        }
+
+        if (filled($single) && $count > 1) {
+            $validator->errors()->add('serial_number', __('inventory::assets.serial_for_one'));
+
+            return;
+        }
+
+        $this->checkSerials($validator, [
+            $serials !== null
+                ? ['key' => 'serial_numbers', 'item_id' => $this->input('item_id'), 'count' => $count, 'serials' => $serials]
+                : ['key' => 'serial_number', 'item_id' => $this->input('item_id'), 'count' => 1, 'serials' => filled($single) ? [$single] : []],
+        ]);
     }
 }

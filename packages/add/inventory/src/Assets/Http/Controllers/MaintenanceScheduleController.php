@@ -8,6 +8,7 @@ use Add\Inventory\Assets\Http\Resources\MaintenanceScheduleResource;
 use Add\Inventory\Assets\Models\Asset;
 use Add\Inventory\Assets\Models\MaintenanceSchedule;
 use Add\Inventory\Assets\Services\MaintenanceService;
+use Add\Inventory\Support\Http\PlaceFilter;
 use Add\Inventory\Support\InventoryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -24,13 +25,14 @@ class MaintenanceScheduleController extends Controller
 
     /**
      * Everything coming due within `days` (default: the configured lead
-     * time), overdue first.
+     * time), overdue first. `place[type]` + `place[id]` narrows it to the
+     * assets anywhere inside that place.
      */
     public function due(Request $request, MaintenanceService $maintenance): AnonymousResourceCollection
     {
         $days = min(365, max(0, $request->integer('days', (int) config('inventory.assets.maintenance_lead_days'))));
 
-        return MaintenanceScheduleResource::collection($maintenance->due($days)->with('asset')->get());
+        return MaintenanceScheduleResource::collection(PlaceFilter::throughAsset($maintenance->due($days), $request)->with('asset')->get());
     }
 
     public function store(MaintenanceRequest $request, Asset $asset): MaintenanceScheduleResource

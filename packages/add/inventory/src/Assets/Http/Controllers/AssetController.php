@@ -16,6 +16,7 @@ use Add\Inventory\Assets\Services\AssetService;
 use Add\Inventory\Catalog\Models\Category;
 use Add\Inventory\Catalog\Models\Item;
 use Add\Inventory\Inventory;
+use Add\Inventory\Support\Http\PlaceFilter;
 use Add\Inventory\Support\Place;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -45,10 +46,10 @@ class AssetController extends Controller
                 $query->whereIn('item_id', Item::query()->select('id')->whereIn('category_id', $category?->subtreeIds() ?? []));
             })
             ->when(AssetStatus::tryFrom((string) $request->input('status')), fn (Builder $query, AssetStatus $status) => $query->where('status', $status))
-            ->when($this->place($request, 'location'), fn (Builder $query, Place $place) => $query->at(
+            ->when(PlaceFilter::from($request, 'location'), fn (Builder $query, Place $place) => $query->at(
                 $request->boolean('within', true) ? Inventory::assetPlaces()->within($place) : [$place],
             ))
-            ->when($this->place($request, 'custodian'), fn (Builder $query, Place $custodian) => $query->whereHas(
+            ->when(PlaceFilter::from($request, 'custodian'), fn (Builder $query, Place $custodian) => $query->whereHas(
                 'currentAssignment',
                 fn (Builder $assignment) => $assignment->where('custodian_type', $custodian->type)->where('custodian_id', $custodian->id),
             ))
@@ -68,9 +69,10 @@ class AssetController extends Controller
         $assets = $service->register(
             Item::query()->findOrFail($data['item_id']),
             isset($data['location']) ? Place::from($data['location']) : null,
-            Arr::except($data, ['item_id', 'location', 'count', 'draft']),
+            Arr::except($data, ['item_id', 'location', 'count', 'draft', 'serial_numbers']),
             $data['count'] ?? 1,
             $request->wantsDraft(),
+            $data['serial_numbers'] ?? [],
         );
 
         return AssetResource::collection($assets->each->load(self::LIST_RELATIONS))->response()->setStatusCode(201);
@@ -91,7 +93,8 @@ class AssetController extends Controller
             array_map(fn (array $line) => [
                 'item' => $items->get($line['item_id']),
                 'count' => $line['count'] ?? 1,
-                'details' => Arr::except($line, ['item_id', 'count']),
+                'details' => Arr::except($line, ['item_id', 'count', 'serial_numbers']),
+                'serials' => $line['serial_numbers'] ?? [],
             ], $data['lines']),
             Arr::only($data, ['purchased_on', 'in_service_on', 'supplier', 'reference', 'attachments', 'currency', 'notes']),
             $request->wantsDraft(),
@@ -193,13 +196,6 @@ class AssetController extends Controller
         );
 
         return response()->json(['message' => __('inventory::assets.disposed_done')]);
-    }
-
-    private function place(Request $request, string $field): ?Place
-    {
-        $value = $request->input($field);
-
-        return is_array($value) && is_string($value['type'] ?? null) && is_numeric($value['id'] ?? null) ? Place::from($value) : null;
     }
 
     private function moment(?string $value): ?CarbonImmutable
