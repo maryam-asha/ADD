@@ -3,10 +3,14 @@
 namespace App\Domain\Finance\Payments;
 
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Payments\Methods\CashMethod;
 use App\Domain\Finance\Payments\Methods\WalletMethod;
 use App\Domain\Identity\Models\User;
+use App\Domain\Kitchen\Enums\KitchenOrderStatus;
+use App\Domain\Kitchen\Enums\OrderRoute;
+use App\Domain\Kitchen\Models\KitchenOrder;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Domain\Membership\Models\Plan;
@@ -32,6 +36,9 @@ use Illuminate\Database\Eloquent\Model;
  */
 class PaymentMethodOptions
 {
+    /** A kitchen order put on its open bill: OrderPaymentChoice::Bill, no driver. */
+    public const BILL = 'bill';
+
     public function __construct(
         private readonly PaymentMethodRegistry $methods,
         private readonly FulfillerRegistry $fulfillers,
@@ -70,11 +77,18 @@ class PaymentMethodOptions
                 $option['available'] = false;
                 $option['reason'] = __('api.payment.session_in_progress');
                 $option['hint'] = __('api.payment.session_in_progress_hint');
+            } elseif ($key === CashMethod::KEY && $this->heldOffTheReceptionRoute($payable)) {
+                $option['available'] = false;
+                $option['reason'] = __('api.payment.kitchen_order_no_cash');
             } elseif ($key === WalletMethod::KEY) {
                 $option = $this->walletOption($option, $purpose, $member, $points);
             }
 
             $methods[] = $option;
+        }
+
+        if ($this->billCanTakeIt($payable)) {
+            array_unshift($methods, ['key' => self::BILL, 'label' => __('api.payment.methods.bill'), 'available' => true, 'reason' => null, 'hint' => null]);
         }
 
         // The unavailable ones first, each group still in config order
@@ -102,6 +116,37 @@ class PaymentMethodOptions
         return $payable instanceof Booking
             && $payable->checked_in_at !== null
             && $payable->checked_out_at === null;
+    }
+
+    /**
+     * A kitchen order held for its card whose bill is still open may be put
+     * on that bill instead (KitchenOrderService::methodsFor()). Not a driver:
+     * nothing is paid now, so the option is only ever sent back as
+     * `payment.method` on POST member/kitchen-orders with `order_id`.
+     */
+    private function billCanTakeIt(?Model $payable): bool
+    {
+        if (! $payable instanceof KitchenOrder
+            || $payable->status !== KitchenOrderStatus::AwaitingPayment
+            || ! $payable->hasBill()) {
+            return false;
+        }
+
+        $bill = $payable->billable;
+
+        return ($bill instanceof Booking || $bill instanceof WalkinSession) && $bill->checked_out_at === null;
+    }
+
+    /**
+     * A kitchen order held for its card, sent to the kitchen rather than to
+     * reception: nobody at a desk takes its cash, so sending it again with
+     * cash is refused (KitchenOrderService::methodsFor()).
+     */
+    private function heldOffTheReceptionRoute(?Model $payable): bool
+    {
+        return $payable instanceof KitchenOrder
+            && $payable->status === KitchenOrderStatus::AwaitingPayment
+            && $payable->route !== OrderRoute::Reception;
     }
 
     private function pointsDue(?PaymentPurpose $purpose, ?User $member, ?Model $payable, ?Plan $plan): ?int

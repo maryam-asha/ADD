@@ -28,6 +28,7 @@ use Illuminate\Validation\Rule;
  * Every parameter is optional. `purpose` keeps only the methods that can pay
  * for it (a top-up: the card); with `payable_id` (the member's own record)
  * or `plan_id` it also prices it and says whether the wallet covers it.
+ * `kitchen_order` with the order's id: its total, from general points only.
  */
 class PaymentMethodsController extends Controller
 {
@@ -41,11 +42,12 @@ class PaymentMethodsController extends Controller
         CouponPreview $preview,
     ): JsonResponse {
         $validated = $request->validate([
-            'purpose' => ['nullable', Rule::in(['wallet_top_up', 'plan_purchase', 'booking', 'booking_extension', 'coworking_session', 'event_registration'])],
+            'purpose' => ['nullable', Rule::in(['wallet_top_up', 'plan_purchase', 'booking', 'booking_extension', 'coworking_session', 'event_registration', 'kitchen_order'])],
             'payable_id' => ['nullable', 'integer'],
             'plan_id' => ['nullable', 'integer'],
             // A coupon the member is about to use: the methods are weighed
-            // against the price it leaves.
+            // against the price it leaves. A kitchen order takes no coupon,
+            // so for one it is ignored.
             'coupon_code' => ['nullable', 'string', 'max:40'],
         ]);
 
@@ -63,7 +65,7 @@ class PaymentMethodsController extends Controller
         try {
             $points = null;
 
-            if (isset($validated['coupon_code']) && ($plan !== null || $payable !== null)) {
+            if (isset($validated['coupon_code']) && $purpose !== PaymentPurpose::KitchenOrder && ($plan !== null || $payable !== null)) {
                 $coupon = $coupons->resolve($validated['coupon_code']);
                 $points = ($plan !== null ? $preview->plan($member, $coupon, $plan) : $preview->owed($member, $coupon, $payable))->finalPoints;
             }

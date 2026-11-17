@@ -506,6 +506,7 @@ return [
         ],
         'session_in_progress' => 'Your session is still in progress.',
         'session_in_progress_hint' => 'To pay in cash, settle your session at reception.',
+        'kitchen_order_no_cash' => 'This order goes straight to the kitchen, so it cannot be paid in cash.',
         'nothing_due' => 'There is nothing to pay.',
         'invalid_amount' => 'Enter the amount as a plain number, such as 12 or 12.50.',
         'no_wallet' => 'There is no wallet to record this payment against.',
@@ -523,6 +524,7 @@ return [
             'wallet' => 'Wallet points',
             'cash' => 'Cash at reception',
             'paymera' => 'Paymera - Bank card',
+            'bill' => 'Add to my bill',
         ],
 
         // Ledger descriptions — these land in the member's wallet history.

@@ -8,6 +8,9 @@ use App\Domain\Booking\Models\Booking;
 use App\Domain\Finance\Payments\Methods\PaymeraGateway;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
+use App\Domain\Kitchen\Enums\KitchenOrderStatus;
+use App\Domain\Kitchen\Enums\OrderRoute;
+use App\Domain\Kitchen\Models\KitchenOrder;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionSource;
 use App\Domain\Membership\Models\Plan;
@@ -242,6 +245,109 @@ class MemberPaymentMethodsTest extends TestCase
             $this->assertTrue($cash['available']);
             $this->assertNull($cash['hint']);
         }
+    }
+
+    private function kitchenOrder(User $member, array $state = []): KitchenOrder
+    {
+        return KitchenOrder::factory()->create([
+            'user_id' => $member->id,
+            'total_points' => 40,
+            ...$state,
+        ]);
+    }
+
+    public function test_a_kitchen_order_is_priced_from_its_total(): void
+    {
+        $member = $this->member(300);
+        $order = $this->kitchenOrder($member, ['status' => KitchenOrderStatus::Preparing]);
+
+        $response = $this->methods(['purpose' => 'kitchen_order', 'payable_id' => $order->id])
+            ->assertOk()
+            ->assertJsonPath('data.amount_points', 40)
+            ->assertJsonPath('data.methods.0.key', 'wallet')
+            ->assertJsonPath('data.methods.0.available', true)
+            ->assertJsonPath('data.methods.0.wallets.0.usable_balance', 300);
+
+        $this->assertSame(['wallet', 'cash', 'paymera'], array_column($response->json('data.methods'), 'key'));
+    }
+
+    public function test_a_kitchen_order_ignores_a_coupon(): void
+    {
+        $member = $this->member(300);
+        $order = $this->kitchenOrder($member, ['status' => KitchenOrderStatus::Preparing]);
+
+        $this->methods(['purpose' => 'kitchen_order', 'payable_id' => $order->id, 'coupon_code' => 'ANY'])
+            ->assertOk()
+            ->assertJsonPath('data.amount_points', 40);
+    }
+
+    public function test_cash_is_unavailable_for_an_order_held_for_its_card_on_the_kitchen_route(): void
+    {
+        $member = $this->member(300);
+        $held = ['status' => KitchenOrderStatus::AwaitingPayment, 'payment_due_at' => now()->addMinutes(10)];
+        $kitchen = $this->kitchenOrder($member, $held + ['route' => OrderRoute::Kitchen]);
+        $reception = $this->kitchenOrder($member, $held + ['route' => OrderRoute::Reception]);
+
+        $cash = fn (KitchenOrder $order) => collect($this->methods(['purpose' => 'kitchen_order', 'payable_id' => $order->id])
+            ->assertOk()->json('data.methods'))->firstWhere('key', 'cash');
+
+        $this->assertFalse($cash($kitchen)['available']);
+        $this->assertSame(__('api.payment.kitchen_order_no_cash', [], 'en'), $cash($kitchen)['reason']);
+        $this->assertTrue($cash($reception)['available']);
+    }
+
+    public function test_an_order_held_for_its_card_may_go_on_its_open_bill(): void
+    {
+        $member = $this->member(300);
+        $order = $this->kitchenOrder($member, ['status' => KitchenOrderStatus::AwaitingPayment, 'payment_due_at' => now()->addMinutes(10)]);
+        $order->billable->forceFill(['user_id' => $member->id, 'checked_out_at' => null])->save();
+
+        $response = $this->methods(['purpose' => 'kitchen_order', 'payable_id' => $order->id])->assertOk();
+        $bill = collect($response->json('data.methods'))->firstWhere('key', 'bill');
+
+        $this->assertNotNull($bill);
+        $this->assertTrue($bill['available']);
+        $this->assertSame(__('api.payment.methods.bill', [], 'en'), $bill['label']);
+        // Cash is the one unavailable (kitchen route), so it leads; the bill heads the rest.
+        $this->assertSame(['cash', 'bill', 'wallet', 'paymera'], array_column($response->json('data.methods'), 'key'));
+    }
+
+    public function test_no_bill_once_it_is_closed_or_when_the_order_is_not_held(): void
+    {
+        $member = $this->member(300);
+        $closed = $this->kitchenOrder($member, ['status' => KitchenOrderStatus::AwaitingPayment, 'payment_due_at' => now()->addMinutes(10)]);
+        $closed->billable->forceFill(['checked_out_at' => now()->subMinute()])->save();
+        $owed = $this->kitchenOrder($member, ['status' => KitchenOrderStatus::Preparing]);
+        $noBill = KitchenOrder::factory()->withoutBill()->create([
+            'user_id' => $member->id,
+            'total_points' => 40,
+            'status' => KitchenOrderStatus::AwaitingPayment,
+            'payment_due_at' => now()->addMinutes(10),
+        ]);
+
+        foreach ([$closed, $owed, $noBill] as $order) {
+            $keys = array_column($this->methods(['purpose' => 'kitchen_order', 'payable_id' => $order->id])->assertOk()->json('data.methods'), 'key');
+
+            $this->assertNotContains('bill', $keys);
+        }
+    }
+
+    public function test_no_bill_for_any_other_purpose(): void
+    {
+        $member = $this->member(300);
+        $booking = $this->unpaidBooking($member);
+
+        $keys = array_column($this->methods(['purpose' => 'booking', 'payable_id' => $booking->id])->json('data.methods'), 'key');
+
+        $this->assertNotContains('bill', $keys);
+    }
+
+    public function test_someone_elses_kitchen_order_is_not_found(): void
+    {
+        $order = $this->kitchenOrder(User::factory()->create(), ['status' => KitchenOrderStatus::Preparing]);
+        $this->member(300);
+
+        $this->methods(['purpose' => 'kitchen_order', 'payable_id' => $order->id])->assertNotFound();
     }
 
     /**
