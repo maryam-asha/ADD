@@ -28,6 +28,7 @@ use App\Domain\Kitchen\Enums\OrderRoute;
 use App\Domain\Kitchen\Enums\OrderSource;
 use App\Domain\Kitchen\Exceptions\KitchenOrderException;
 use App\Domain\Kitchen\Models\KitchenOrder;
+use App\Domain\Kitchen\Models\KitchenOrderLine;
 use App\Domain\Kitchen\Models\KitchenStore;
 use App\Domain\Kitchen\Models\QrPoint;
 use App\Domain\Leasing\Models\OfficeLease;
@@ -393,9 +394,27 @@ class KitchenOrderService
      *
      * @throws KitchenOrderException not pending or the bill closed (409); a line short (422)
      */
-    public function accept(KitchenOrder $order, User $staff): KitchenOrder
+    /**
+     * The café takes the order on, drawing its lines from the kitchen store.
+     *
+     * `$quantities` (line id => quantity) is what the café can make of each
+     * line when it is short of something: fewer than ordered, or 0 to take
+     * the item off. A line not named is made as ordered; none named accepts
+     * the order as it was sent. The change applies at once — the member is
+     * told, not asked: each line keeps what was ordered beside what is made,
+     * the order's total drops to what is made, and what it had already been
+     * paid beyond that goes back as points to the wallet that paid
+     * (KitchenOrderRefunder::refundDifference()). An order on a bill, not
+     * paid yet, simply owes less. Taking every item off is a rejection, so it
+     * is refused here.
+     *
+     * @param  array<int, int>  $quantities
+     *
+     * @throws KitchenOrderException 422: a line not on the order, more than was ordered, or no item left
+     */
+    public function accept(KitchenOrder $order, User $staff, array $quantities = []): KitchenOrder
     {
-        DB::transaction(function () use ($order, $staff) {
+        DB::transaction(function () use ($order, $staff, $quantities) {
             // One lock order everywhere: the bill, then the order — the same
             // as a closing bill cancelling its pending orders.
             $bill = $this->lockedBill($order);
@@ -409,8 +428,14 @@ class KitchenOrderService
 
             $store = Warehouse::query()->findOrFail($locked->warehouse_id)->asPlace();
             $source = new Place(KitchenOrder::SOURCE, $locked->id);
+            $lines = $locked->lines()->with('item.category', 'item.unit')->get();
+            $adjusted = $this->applyQuantities($lines, $quantities);
 
-            foreach ($locked->lines()->with('item.category', 'item.unit')->get() as $line) {
+            foreach ($lines as $line) {
+                if ($line->quantity <= 0) {
+                    continue;
+                }
+
                 try {
                     $this->stock->issue($line->item, $store, $line->quantity, IssueReason::Sale, $source);
                 } catch (InsufficientStockException) {
@@ -420,13 +445,30 @@ class KitchenOrderService
                 }
             }
 
+            $before = (int) $locked->total_points;
+            $total = (int) $lines->sum('line_points');
+
             $locked->update([
                 'status' => KitchenOrderStatus::Preparing,
                 'accepted_by' => $staff->id,
                 'accepted_at' => now(),
+                'total_points' => $total,
+                'adjusted_at' => $adjusted ? now() : null,
             ]);
 
-            $this->notifier->accepted($locked);
+            if (! $adjusted) {
+                $this->notifier->accepted($locked);
+
+                return;
+            }
+
+            $refund = $this->refunder->refundDifference(
+                $locked,
+                $before - $total,
+                __('api.kitchen.adjustment_refund_description', ['order' => '#'.$locked->id]),
+            );
+
+            $this->notifier->acceptedWithChanges($locked, $refund === null ? 0 : (int) $refund->amount);
         });
 
         return $order->refresh();
@@ -739,6 +781,54 @@ class KitchenOrderService
      * @param  list<array{sale_item_id: int, quantity: int}>  $lines
      * @return list<array{sale_item_id: int, inventory_item_id: int, quantity: int, unit_price_points: int, line_points: int}>
      */
+    /**
+     * What the café can make of each line (`$quantities`, line id =>
+     * quantity), written onto the lines: a line not named stays as ordered.
+     * Returns whether any line now makes fewer than was ordered.
+     *
+     * @param  Collection<int, KitchenOrderLine>  $lines
+     * @param  array<int, int>  $quantities
+     *
+     * @throws KitchenOrderException 422
+     */
+    private function applyQuantities(Collection $lines, array $quantities): bool
+    {
+        $byId = $lines->keyBy('id');
+
+        foreach ($quantities as $lineId => $quantity) {
+            $line = $byId->get((int) $lineId)
+                ?? throw new KitchenOrderException('api.kitchen.line_not_on_order', 422);
+
+            if ((int) $quantity > $line->orderedQuantity()) {
+                throw new KitchenOrderException('api.kitchen.line_above_ordered', 422, [
+                    'item' => (string) $line->item?->translate('name'),
+                ]);
+            }
+        }
+
+        if ($lines->every(fn (KitchenOrderLine $line) => (int) ($quantities[$line->id] ?? $line->quantity) <= 0)) {
+            throw new KitchenOrderException('api.kitchen.accept_needs_an_item', 422);
+        }
+
+        $adjusted = false;
+
+        foreach ($lines as $line) {
+            $quantity = (int) ($quantities[$line->id] ?? $line->quantity);
+
+            if ($quantity !== $line->quantity) {
+                $line->forceFill([
+                    'ordered_quantity' => $line->orderedQuantity(),
+                    'quantity' => $quantity,
+                    'line_points' => (int) $line->unit_price_points * $quantity,
+                ])->save();
+            }
+
+            $adjusted = $adjusted || $quantity < $line->orderedQuantity();
+        }
+
+        return $adjusted;
+    }
+
     private function price(array $lines, KitchenStore $store): array
     {
         $saleItems = SaleItem::query()->with('item')->whereKey(array_column($lines, 'sale_item_id'))->get()->keyBy('id');
@@ -769,6 +859,7 @@ class KitchenOrderService
                 'sale_item_id' => $saleItem->id,
                 'inventory_item_id' => $saleItem->inventory_item_id,
                 'quantity' => $quantity,
+                'ordered_quantity' => $quantity,
                 'unit_price_points' => $saleItem->price_points,
                 'line_points' => $saleItem->price_points * $quantity,
             ];

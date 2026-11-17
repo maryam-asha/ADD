@@ -44,17 +44,27 @@ class KitchenOrderResource extends JsonResource
                 'cash_return' => $this->cash_return?->value,
             ],
             'payment_due_at' => $this->payment_due_at?->toIso8601String(),
+            // `quantity` is what is made; `ordered_quantity` what the member
+            // ordered — more, or the item taken off (0), when the café
+            // accepted the order with less of it. `id` is the line, as the
+            // café's accept names it.
             'lines' => $this->lines->map(fn (KitchenOrderLine $line) => [
+                'id' => $line->id,
                 'sale_item_id' => $line->sale_item_id,
                 'name' => $line->item?->translate('name'),
                 'image_url' => $line->item?->image_url,
                 'quantity' => $line->quantity,
+                'ordered_quantity' => $line->orderedQuantity(),
                 'unit_price_points' => $line->unit_price_points,
                 'line_points' => $line->line_points,
             ])->values(),
             // How many items the order holds: every line's quantity.
             'items_count' => (int) $this->lines->sum('quantity'),
             'total_points' => $this->total_points,
+            // Accepted with fewer items than were ordered: what was ordered
+            // came to `ordered_total_points`; `total_points` is what is made.
+            'adjusted' => $this->wasAdjusted(),
+            'ordered_total_points' => $this->orderedTotalPoints(),
             'rejection_reason' => $this->rejection_reason,
             'cancelled_by' => $this->cancelled_by?->value,
             'timestamps' => [

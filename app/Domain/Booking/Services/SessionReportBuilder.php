@@ -176,6 +176,7 @@ class SessionReportBuilder
                     'sale_item_id' => $line->sale_item_id,
                     'name' => $line->item?->translate('name'),
                     'quantity' => (int) $line->quantity,
+                    'ordered_quantity' => $line->orderedQuantity(),
                     'unit_price_points' => (int) $line->unit_price_points,
                     'line_points' => (int) $line->line_points,
                 ])->values()->all(),

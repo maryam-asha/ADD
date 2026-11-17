@@ -95,6 +95,8 @@ class WalletHistoryService
             'debitPayment.plan',
             'refundPayment.payable' => $payable,
             'refundPayment.plan',
+            // The difference given back on a café order accepted with less.
+            'adjustedKitchenOrder.lines.item',
         ];
     }
 

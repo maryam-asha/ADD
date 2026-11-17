@@ -7,6 +7,7 @@ use App\Concerns\HasReference;
 use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Identity\Models\User;
+use App\Domain\Kitchen\Models\KitchenOrder;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Domain\Membership\Enums\WalletTransactionSource;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -121,6 +122,15 @@ class WalletTransaction extends Model
     /**
      * The payment this row gave points back for (PaymentService::refund()).
      */
+    /**
+     * The café order whose difference this row gave back, when the café
+     * accepted it with fewer items than were ordered.
+     */
+    public function adjustedKitchenOrder(): HasOne
+    {
+        return $this->hasOne(KitchenOrder::class, 'adjustment_refund_transaction_id');
+    }
+
     public function refundPayment(): HasOne
     {
         return $this->hasOne(Payment::class, 'refund_transaction_id');

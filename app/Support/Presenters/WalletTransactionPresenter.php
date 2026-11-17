@@ -76,7 +76,7 @@ class WalletTransactionPresenter
             'time' => $at?->format('h:i A'),
             // The café order the row paid or gave back, with its items;
             // null for every other row.
-            'order' => $this->kitchenOrder($payment, $locale),
+            'order' => $this->kitchenOrder($transaction, $payment, $locale),
         ];
     }
 
@@ -146,7 +146,12 @@ class WalletTransactionPresenter
             return $transaction->description ?: $label;
         }
 
-        $subject = $payment === null ? null : $this->subject($payment, $locale);
+        $subject = match (true) {
+            $payment !== null => $this->subject($payment, $locale),
+            // The difference given back on a café order accepted with less.
+            $transaction->adjustedKitchenOrder !== null => '#'.$transaction->adjustedKitchenOrder->id,
+            default => null,
+        };
 
         return $subject === null ? $label : "{$label} — {$subject}";
     }
@@ -171,14 +176,15 @@ class WalletTransactionPresenter
     }
 
     /**
-     * The café order behind the row — paid with it, or refunded by it — and
-     * what was in it, at the prices of the moment it was sent.
+     * The café order behind the row — paid with it, refunded by it, or the
+     * difference given back when the café accepted it with less — and what
+     * was in it, at the prices of the moment it was sent.
      *
      * @return array<string, mixed>|null
      */
-    private function kitchenOrder(?Payment $payment, string $locale): ?array
+    private function kitchenOrder(WalletTransaction $transaction, ?Payment $payment, string $locale): ?array
     {
-        $order = $payment?->payable;
+        $order = $payment?->payable ?? $transaction->adjustedKitchenOrder;
 
         if (! $order instanceof KitchenOrder) {
             return null;
@@ -188,12 +194,14 @@ class WalletTransactionPresenter
             'id' => $order->id,
             'status' => $order->status->value,
             'total_points' => (int) $order->total_points,
+            'adjusted' => $order->wasAdjusted(),
             'items_count' => (int) $order->lines->sum('quantity'),
             'items' => $order->lines->map(fn (KitchenOrderLine $line) => [
                 'sale_item_id' => $line->sale_item_id,
                 'name' => $line->item?->translate('name', $locale),
                 'image_url' => $line->item?->image_url,
                 'quantity' => (int) $line->quantity,
+                'ordered_quantity' => $line->orderedQuantity(),
                 'unit_price_points' => (int) $line->unit_price_points,
                 'line_points' => (int) $line->line_points,
             ])->values()->all(),

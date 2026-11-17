@@ -549,6 +549,14 @@ return [
             'title' => 'The café accepted your order',
             'body' => 'Order :order is being prepared.',
         ],
+        'accepted_with_changes' => [
+            'title' => 'The café accepted your order with changes',
+            'body' => 'Order :order is being prepared, but some items are not available, so their quantities were changed. You are only charged for what is made.',
+        ],
+        'accepted_with_changes_refunded' => [
+            'title' => 'The café accepted your order with changes',
+            'body' => 'Order :order is being prepared, but some items are not available, so their quantities were changed. :points points were returned to your wallet.',
+        ],
         'ready' => [
             'title' => 'Your order is ready',
             'body' => 'Order :order is ready. Come and collect it from the café.',

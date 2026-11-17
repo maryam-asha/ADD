@@ -138,6 +138,19 @@ class KitchenOrderNotifier
         $this->changed($order, 'kitchen_order.accepted');
     }
 
+    /**
+     * Accepted with fewer items than were ordered: the board and the
+     * member's app hear it as any acceptance, and the member is told it
+     * changed — with the points given back (`$refundedPoints`), or, for an
+     * order on a bill not paid yet, that only what is made is charged.
+     */
+    public function acceptedWithChanges(KitchenOrder $order, int $refundedPoints): void
+    {
+        $refundedPoints > 0
+            ? $this->changed($order, 'kitchen_order.accepted_with_changes_refunded', ['points' => $refundedPoints])
+            : $this->changed($order, 'kitchen_order.accepted_with_changes');
+    }
+
     public function rejected(KitchenOrder $order): void
     {
         $this->changed($order, 'kitchen_order.rejected', ['reason' => (string) $order->rejection_reason]);

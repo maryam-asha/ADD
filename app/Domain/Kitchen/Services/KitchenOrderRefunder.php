@@ -8,6 +8,9 @@ use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Kitchen\Enums\CashReturn;
 use App\Domain\Kitchen\Models\KitchenOrder;
+use App\Domain\Membership\Enums\WalletTransactionSource;
+use App\Domain\Membership\Models\WalletTransaction;
+use App\Domain\Membership\Services\WalletService;
 
 /**
  * Gives back what an order that was not made took (2026-11-14 spec,
@@ -37,7 +40,48 @@ class KitchenOrderRefunder
     public function __construct(
         private readonly PaymentService $payments,
         private readonly KitchenOrderNotifier $notifier,
+        private readonly WalletService $wallets,
     ) {}
+
+    /**
+     * Gives back `$points` of what the order was paid, when the café accepted
+     * it with fewer items than were ordered: as points, to the wallet of the
+     * payment that settled it, whatever the method — cash at the desk and a
+     * card both became points in that wallet when they were taken, so the
+     * difference goes back the same way, never as cash across the desk. The
+     * payment itself is left as it is (it paid for the order as sent); the
+     * credit is the order's `adjustment_refund_transaction_id`.
+     *
+     * An order not paid yet — on a bill — has nothing to give back: its lower
+     * total is simply what the bill owes for it, and null is returned. Runs
+     * inside the caller's transaction, on the order it has locked.
+     */
+    public function refundDifference(KitchenOrder $order, int $points, string $description): ?WalletTransaction
+    {
+        $payment = Payment::query()
+            ->forPayable($order)
+            ->where('status', PaymentStatus::Accepted)
+            ->whereNull('refunded_at')
+            ->whereNotNull('debit_transaction_id')
+            ->latest('id')
+            ->lockForUpdate()
+            ->first();
+
+        if ($payment === null || $payment->wallet === null || $points <= 0) {
+            return null;
+        }
+
+        $transaction = $this->wallets->creditGeneral(
+            $payment->wallet,
+            min($points, (int) $payment->amount_points),
+            WalletTransactionSource::Refund,
+            $description,
+        );
+
+        $order->forceFill(['adjustment_refund_transaction_id' => $transaction->id])->save();
+
+        return $transaction;
+    }
 
     public function refund(KitchenOrder $order, string $description): void
     {

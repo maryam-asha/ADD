@@ -17,6 +17,7 @@ use App\Domain\Kitchen\Enums\KitchenOrderStatus;
 use App\Domain\Kitchen\Enums\OrderPaymentChoice;
 use App\Domain\Kitchen\Enums\OrderRoute;
 use App\Domain\Kitchen\Enums\OrderSource;
+use App\Domain\Membership\Models\WalletTransaction;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -73,6 +74,8 @@ class KitchenOrder extends Model
         'cash_return',
         'cash_return_resolved_by',
         'cash_return_resolved_at',
+        'adjusted_at',
+        'adjustment_refund_transaction_id',
     ];
 
     protected function casts(): array
@@ -105,12 +108,39 @@ class KitchenOrder extends Model
             'cash_return' => CashReturn::class,
             'cash_return_resolved_by' => 'integer',
             'cash_return_resolved_at' => 'datetime',
+            'adjusted_at' => 'datetime',
+            'adjustment_refund_transaction_id' => 'integer',
         ];
     }
 
     public function lines(): HasMany
     {
         return $this->hasMany(KitchenOrderLine::class);
+    }
+
+    /**
+     * The wallet row that gave back the difference when the café accepted the
+     * order with fewer items than were ordered (adjusted_at), if it had been
+     * paid by then.
+     */
+    public function adjustmentRefund(): BelongsTo
+    {
+        return $this->belongsTo(WalletTransaction::class, 'adjustment_refund_transaction_id');
+    }
+
+    /** Whether the café accepted it with fewer items than were ordered. */
+    public function wasAdjusted(): bool
+    {
+        return $this->adjusted_at !== null;
+    }
+
+    /**
+     * What the member ordered, at the prices of the moment it was sent —
+     * `total_points` once the café took items off.
+     */
+    public function orderedTotalPoints(): int
+    {
+        return (int) $this->lines->sum(fn (KitchenOrderLine $line) => $line->orderedQuantity() * (int) $line->unit_price_points);
     }
 
     /**

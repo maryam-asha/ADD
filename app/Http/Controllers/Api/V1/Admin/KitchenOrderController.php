@@ -8,6 +8,7 @@ use App\Domain\Kitchen\Exceptions\KitchenOrderException;
 use App\Domain\Kitchen\Models\KitchenOrder;
 use App\Domain\Kitchen\Services\KitchenOrderService;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\AcceptKitchenOrderLinesRequest;
 use App\Http\Requests\Admin\RejectKitchenOrderRequest;
 use App\Http\Resources\Kitchen\AdminKitchenOrderResource;
 use Closure;
@@ -72,10 +73,14 @@ class KitchenOrderController extends Controller
         return new AdminKitchenOrderResource($order->load(self::RELATIONS));
     }
 
-    /** POST admin/kitchen/orders/{order}/accept — draws its lines from the kitchen store. */
-    public function accept(Request $request, KitchenOrder $order, KitchenOrderService $orders): AdminKitchenOrderResource|JsonResponse
+    /**
+     * POST admin/kitchen/orders/{order}/accept — draws its lines from the
+     * kitchen store; `lines` takes items off, or makes fewer of them, when the
+     * café is short (AcceptKitchenOrderLinesRequest).
+     */
+    public function accept(AcceptKitchenOrderLinesRequest $request, KitchenOrder $order, KitchenOrderService $orders): AdminKitchenOrderResource|JsonResponse
     {
-        return $this->act(fn () => $orders->accept($order, $request->user()));
+        return $this->act(fn () => $orders->accept($order, $request->user(), $request->quantities()));
     }
 
     /** POST admin/kitchen/orders/{order}/reject `{reason}` — a pending order only. */
