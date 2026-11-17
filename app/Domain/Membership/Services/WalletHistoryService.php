@@ -6,6 +6,7 @@ use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Identity\Models\User;
+use App\Domain\Kitchen\Models\KitchenOrder;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Models\WalletTransaction;
@@ -78,11 +79,13 @@ class WalletHistoryService
      */
     private function relations(): array
     {
-        // What each payable is named by: its space, or its event.
+        // What each payable is named by: its space, or its event; a café
+        // order shows its items.
         $payable = fn (MorphTo $morph) => $morph->morphWith([
             Booking::class => ['space'],
             WalkinSession::class => ['space'],
             EventAttendee::class => ['event'],
+            KitchenOrder::class => ['lines.item'],
         ]);
 
         return [

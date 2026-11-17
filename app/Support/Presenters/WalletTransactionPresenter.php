@@ -9,6 +9,8 @@ use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\Methods\WalletMethod;
 use App\Domain\Identity\Models\User;
+use App\Domain\Kitchen\Models\KitchenOrder;
+use App\Domain\Kitchen\Models\KitchenOrderLine;
 use App\Domain\Membership\Enums\WalletTransactionSource;
 use App\Domain\Membership\Models\WalletTransaction;
 use App\Support\Time\LocalTime;
@@ -72,6 +74,9 @@ class WalletTransactionPresenter
             'created_at' => $at?->toIso8601String(),
             'date' => $at?->format('Y-m-d'),
             'time' => $at?->format('h:i A'),
+            // The café order the row paid or gave back, with its items;
+            // null for every other row.
+            'order' => $this->kitchenOrder($payment, $locale),
         ];
     }
 
@@ -160,8 +165,39 @@ class WalletTransactionPresenter
         return match (true) {
             $payable instanceof Booking, $payable instanceof WalkinSession => $payable->space?->translate('name', $locale),
             $payable instanceof EventAttendee => $payable->event?->translate('title', $locale),
+            $payable instanceof KitchenOrder => '#'.$payable->id,
             default => null,
         };
+    }
+
+    /**
+     * The café order behind the row — paid with it, or refunded by it — and
+     * what was in it, at the prices of the moment it was sent.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function kitchenOrder(?Payment $payment, string $locale): ?array
+    {
+        $order = $payment?->payable;
+
+        if (! $order instanceof KitchenOrder) {
+            return null;
+        }
+
+        return [
+            'id' => $order->id,
+            'status' => $order->status->value,
+            'total_points' => (int) $order->total_points,
+            'items_count' => (int) $order->lines->sum('quantity'),
+            'items' => $order->lines->map(fn (KitchenOrderLine $line) => [
+                'sale_item_id' => $line->sale_item_id,
+                'name' => $line->item?->translate('name', $locale),
+                'image_url' => $line->item?->image_url,
+                'quantity' => (int) $line->quantity,
+                'unit_price_points' => (int) $line->unit_price_points,
+                'line_points' => (int) $line->line_points,
+            ])->values()->all(),
+        ];
     }
 
     /**

@@ -14,12 +14,15 @@ use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
+use App\Domain\Kitchen\Enums\KitchenOrderStatus;
+use App\Domain\Kitchen\Models\KitchenOrder;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Domain\Membership\Enums\WalletTransactionSource;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Models\WalletTransaction;
 use App\Domain\Membership\Services\WalletService;
+use App\Domain\Retail\Models\SaleItem;
 use App\Support\Time\LocalTime;
 use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
@@ -436,5 +439,47 @@ class MemberWalletTest extends TestCase
             ->assertJsonPath('data.transactions.0.paid.currency', 'SYP');
 
         $this->getJson('/api/v1/member/wallet')->assertJsonPath('data.balance.points', 10);
+    }
+
+    public function test_a_cafe_order_row_shows_its_items(): void
+    {
+        $member = $this->member(300);
+        $cola = SaleItem::factory()->create(['price_points' => 20]);
+        $cola->item->update(['name' => ['en' => 'Cola', 'ar' => 'كولا']]);
+        $order = KitchenOrder::factory()->create([
+            'user_id' => $member->id,
+            'status' => KitchenOrderStatus::Preparing,
+            'total_points' => 40,
+        ]);
+        $order->lines()->create([
+            'sale_item_id' => $cola->id,
+            'inventory_item_id' => $cola->inventory_item_id,
+            'quantity' => 2,
+            'unit_price_points' => 20,
+            'line_points' => 40,
+        ]);
+        $payment = app(PaymentService::class)
+            ->start(PaymentPurpose::KitchenOrder, $member, 'wallet', ['payable' => $order])['payment'];
+        $this->actingAsMember($member);
+
+        $this->getJson('/api/v1/member/wallet/transactions')
+            ->assertOk()
+            ->assertJsonPath('data.transactions.0.kind', 'kitchen_order')
+            ->assertJsonPath('data.transactions.0.kind_label', 'Café order')
+            ->assertJsonPath('data.transactions.0.title', "Café order — #{$order->id}")
+            ->assertJsonPath('data.transactions.0.order.id', $order->id)
+            ->assertJsonPath('data.transactions.0.order.items_count', 2)
+            ->assertJsonPath('data.transactions.0.order.items.0.name', 'Cola')
+            ->assertJsonPath('data.transactions.0.order.items.0.quantity', 2)
+            ->assertJsonPath('data.transactions.0.order.items.0.line_points', 40)
+            // A row no café order explains carries none.
+            ->assertJsonPath('data.transactions.1.order', null);
+
+        $this->withHeader('lang', 'ar')
+            ->getJson("/api/v1/member/wallet/transactions/{$payment->debit_transaction_id}")
+            ->assertOk()
+            ->assertJsonPath('data.kind_label', 'طلب من الكافيه')
+            ->assertJsonPath('data.order.items.0.name', 'كولا')
+            ->assertJsonPath('data.balance.after.points', 260);
     }
 }

@@ -399,7 +399,7 @@ return [
             'coworking_session' => 'a coworking session',
             'booking_extension' => 'a booking extension',
             'item_sale' => 'a purchase at reception',
-            'kitchen_order' => 'a kitchen order',
+            'kitchen_order' => 'a café order',
         ],
     ],
 
@@ -546,15 +546,15 @@ return [
     // App\Domain\Kitchen\Services\KitchenOrderNotifier.
     'kitchen_order' => [
         'accepted' => [
-            'title' => 'The kitchen accepted your order',
+            'title' => 'The café accepted your order',
             'body' => 'Order :order is being prepared.',
         ],
         'ready' => [
             'title' => 'Your order is ready',
-            'body' => 'Order :order is ready. Come and collect it from the kitchen.',
+            'body' => 'Order :order is ready. Come and collect it from the café.',
         ],
         'rejected' => [
-            'title' => 'The kitchen could not take your order',
+            'title' => 'The café could not take your order',
             'body' => 'Order :order was declined: :reason',
         ],
         'delivered' => [
@@ -563,7 +563,7 @@ return [
         ],
         'cancelled_by_system' => [
             'title' => 'Your order was cancelled',
-            'body' => 'Order :order was cancelled because your session or booking ended before the kitchen accepted it.',
+            'body' => 'Order :order was cancelled because your session or booking ended before the café accepted it.',
         ],
         'expired_payment' => [
             'title' => 'Your order was cancelled',
@@ -575,7 +575,7 @@ return [
         ],
         'expired_kitchen' => [
             'title' => 'Your order was cancelled',
-            'body' => 'Order :order was cancelled because the kitchen did not accept it in time. Anything you paid is being given back.',
+            'body' => 'Order :order was cancelled because the café did not accept it in time. Anything you paid is being given back.',
         ],
         'refunded' => [
             'title' => 'Your order was refunded',
@@ -591,7 +591,7 @@ return [
         ],
         'accepted_by_reception' => [
             'title' => 'Your order is confirmed',
-            'body' => 'Reception confirmed you are here. Order :order is on its way to the kitchen.',
+            'body' => 'Reception confirmed you are here. Order :order is on its way to the café.',
         ],
         'rejected_by_reception' => [
             'title' => 'Reception could not take your order',

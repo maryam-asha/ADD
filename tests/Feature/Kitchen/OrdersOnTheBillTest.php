@@ -298,8 +298,8 @@ class OrdersOnTheBillTest extends TestCase
 
         $this->assertSame(
             [
-                ["Kitchen order #{$unpaid->id}", 30, false],
-                ["Kitchen order #{$paid->id}", 20, true],
+                ["Café order #{$unpaid->id}", 30, false],
+                ["Café order #{$paid->id}", 20, true],
             ],
             $lines->map(fn (array $line) => [$line['label'], $line['points'], $line['paid']])->all(),
         );
