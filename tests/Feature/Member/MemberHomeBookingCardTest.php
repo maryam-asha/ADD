@@ -105,7 +105,7 @@ class MemberHomeBookingCardTest extends TestCase
                 'checked_out_at' => null,
                 'payment' => null,
                 // No kitchen order on it yet.
-                'orders' => ['count' => 0, 'total_points' => 0, 'unpaid_points' => 0],
+                'orders' => ['count' => 0, 'items_count' => 0, 'total_points' => 0, 'unpaid_points' => 0],
                 // Door buttons only once checked in.
                 'door' => ['available' => false],
                 // Checking out too: nothing to leave before checking in.

@@ -52,6 +52,8 @@ class KitchenOrderResource extends JsonResource
                 'unit_price_points' => $line->unit_price_points,
                 'line_points' => $line->line_points,
             ])->values(),
+            // How many items the order holds: every line's quantity.
+            'items_count' => (int) $this->lines->sum('quantity'),
             'total_points' => $this->total_points,
             'rejection_reason' => $this->rejection_reason,
             'cancelled_by' => $this->cancelled_by?->value,

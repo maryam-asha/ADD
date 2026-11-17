@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use App\Domain\Booking\Enums\SessionStartSource;
 use App\Domain\Booking\Models\ArrivalRequest;
+use App\Http\Resources\Kitchen\BillKitchenOrdersResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -26,7 +27,10 @@ class CurrentCoworkingSessionResource extends JsonResource
             return [
                 'state' => 'active',
                 'arrival_request' => null,
-            ] + (new CoworkingSessionResource($this->resource))->resolve($request);
+            ] + (new CoworkingSessionResource($this->resource))->resolve($request) + [
+                // Its kitchen orders: each with its items and status, and the summary.
+                'orders' => (new BillKitchenOrdersResource($this->resource))->resolve($request),
+            ];
         }
 
         $arrival = $this->resource;
@@ -59,6 +63,7 @@ class CurrentCoworkingSessionResource extends JsonResource
             'end_request' => null,
             'payment' => null,
             'discounts' => [],
+            'orders' => (new BillKitchenOrdersResource(null))->resolve($request),
         ];
     }
 }

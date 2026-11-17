@@ -282,7 +282,7 @@ class MemberHomeService
             // decision 11): a booking paid or covered by its plan is still
             // awaiting_payment while one of them is unpaid. Nothing is ordered
             // on a booking not checked in yet, so `ready` asks nothing.
-            'orders' => $state === 'ready' ? ['count' => 0, 'total_points' => 0, 'unpaid_points' => 0] : $this->orders->summaryFor($booking),
+            'orders' => $state === 'ready' ? KitchenOrderSettlement::emptySummary() : $this->orders->summaryFor($booking),
             // Whether to show the door buttons (POST member/bookings/{id}/door/unlock|lock):
             // only once checked in, and only for a room whose door code is live.
             'door' => ['available' => $state === 'active' && $this->doors->available($booking)],

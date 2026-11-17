@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Services\BookingPresentationService;
+use App\Http\Resources\Kitchen\BillKitchenOrdersResource;
 use App\Support\Presenters\AppliedDiscountPresenter;
 use App\Support\Presenters\PriceLabelPresenter;
 use App\Support\Time\LocalTime;
@@ -96,6 +97,9 @@ class MemberBookingDetailResource extends JsonResource
                 'extend_disabled_reason' => $actions['extend_disabled_reason'],
             ],
             'cancellation' => $presentation->cancellation($booking, $locale, $viewer),
+            // Its kitchen orders once checked in: each with its items and
+            // status, and what the accepted ones come to (empty before).
+            'orders' => (new BillKitchenOrdersResource($booking))->resolve($request),
         ];
     }
 

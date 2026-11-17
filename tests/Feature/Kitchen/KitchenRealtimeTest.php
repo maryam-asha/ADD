@@ -189,7 +189,7 @@ class KitchenRealtimeTest extends TestCase
 
         Event::assertDispatched(MemberKitchenOrderUpdated::class, fn (MemberKitchenOrderUpdated $e) => $this->onChannel($e, "private-member.{$this->member->id}")
             && $e->broadcastAs() === 'kitchen_order.updated'
-            && $e->broadcastWith() === ['order_id' => $order->id, 'status' => 'preparing']);
+            && $e->broadcastWith() === ['order_id' => $order->id, 'status' => 'preparing', 'session_type' => 'walkin', 'session_id' => $order->billable_id]);
         Event::assertDispatched(KitchenOrderChanged::class, fn (KitchenOrderChanged $e) => $this->onChannel($e, 'private-kitchen')
             && $e->broadcastAs() === 'kitchen_order.updated'
             && $e->broadcastWith() === ['order_id' => $order->id, 'branch_id' => $this->branch->id, 'status' => 'preparing']);
@@ -257,7 +257,7 @@ class KitchenRealtimeTest extends TestCase
 
         $this->assertSame([$order->id], $cancelled->pluck('id')->all());
         Event::assertDispatchedTimes(MemberKitchenOrderUpdated::class, 1);
-        Event::assertDispatched(MemberKitchenOrderUpdated::class, fn (MemberKitchenOrderUpdated $e) => $e->broadcastWith() === ['order_id' => $order->id, 'status' => 'cancelled']);
+        Event::assertDispatched(MemberKitchenOrderUpdated::class, fn (MemberKitchenOrderUpdated $e) => $e->broadcastWith() === ['order_id' => $order->id, 'status' => 'cancelled', 'session_type' => 'walkin', 'session_id' => $session->id]);
         Event::assertDispatched(KitchenOrderChanged::class, fn (KitchenOrderChanged $e) => $e->broadcastWith() === ['order_id' => $order->id, 'branch_id' => $this->branch->id, 'status' => 'cancelled']);
         $this->assertNoticed($this->member, 'kitchen_order.cancelled_by_system');
     }

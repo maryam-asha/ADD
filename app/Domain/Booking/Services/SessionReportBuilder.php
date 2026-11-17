@@ -6,6 +6,7 @@ use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Kitchen\Models\KitchenOrder;
+use App\Domain\Kitchen\Models\KitchenOrderLine;
 use App\Domain\Kitchen\Services\KitchenOrderSettlement;
 use App\Domain\Membership\Models\ResourceConsumption;
 use App\Domain\Membership\Services\PlanAllowanceService;
@@ -147,25 +148,37 @@ class SessionReportBuilder
     /**
      * One line per accepted kitchen order on it, oldest first: its own
      * charge beside the session's (kitchen orders spec, decision 11), and
-     * whether it is paid yet.
+     * whether it is paid yet. `quantity` is how many items it holds (every
+     * line's quantity), and `items` what they are, at the prices of the
+     * moment it was sent.
      *
      * @param  Collection<int, KitchenOrder>  $orders
      * @return list<array<string, mixed>>
      */
     private function orderLines(Collection $orders): array
     {
+        $orders->loadMissing('lines.item');
+
         return $orders
             ->map(fn (KitchenOrder $order) => [
                 'kind' => 'order',
                 'id' => $order->id,
                 'label' => __('api.kitchen_order.description', ['id' => $order->id]),
-                'quantity' => null,
+                'quantity' => (int) $order->lines->sum('quantity'),
                 'unit' => null,
                 'source' => null,
                 'points' => (int) $order->total_points,
                 'amount' => $this->points->pointsToUsd((int) $order->total_points),
                 'paid' => $order->paid_at !== null,
                 'recorded_at' => $order->created_at?->toIso8601String(),
+                'status' => $order->status->value,
+                'items' => $order->lines->map(fn (KitchenOrderLine $line) => [
+                    'sale_item_id' => $line->sale_item_id,
+                    'name' => $line->item?->translate('name'),
+                    'quantity' => (int) $line->quantity,
+                    'unit_price_points' => (int) $line->unit_price_points,
+                    'line_points' => (int) $line->line_points,
+                ])->values()->all(),
             ])
             ->values()
             ->all();

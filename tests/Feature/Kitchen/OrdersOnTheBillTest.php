@@ -269,7 +269,11 @@ class OrdersOnTheBillTest extends TestCase
             ->assertJsonPath('data.closing.points', 200)
             ->assertJsonPath('data.closing.orders_points', 50)
             ->assertJsonPath('data.closing.total_points', 250)
-            ->assertJsonPath('data.orders', ['count' => 3, 'total_points' => 65, 'unpaid_points' => 50]);
+            ->assertJsonPath('data.orders.count', 3)
+            ->assertJsonPath('data.orders.total_points', 65)
+            ->assertJsonPath('data.orders.unpaid_points', 50)
+            // Every order on it is listed, pending and rejected too, each with its status.
+            ->assertJsonPath('data.orders.list.*.status', ['preparing', 'delivered', 'ready', 'pending', 'rejected']);
 
         // The desk sees the same two figures before it ends the session.
         $this->actingAsOperations();
@@ -332,7 +336,7 @@ class OrdersOnTheBillTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.active_booking.0.id', $booking->id)
             ->assertJsonPath('data.active_booking.0.state', 'awaiting_payment')
-            ->assertJsonPath('data.active_booking.0.orders', ['count' => 1, 'total_points' => 30, 'unpaid_points' => 30]);
+            ->assertJsonPath('data.active_booking.0.orders', ['count' => 1, 'items_count' => 0, 'total_points' => 30, 'unpaid_points' => 30]);
 
         $order->forceFill(['paid_at' => now()])->save();
 
@@ -360,7 +364,7 @@ class OrdersOnTheBillTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.active_session.state', 'awaiting_payment')
             ->assertJsonPath('data.active_session.id', $session->id)
-            ->assertJsonPath('data.active_session.orders', ['count' => 1, 'total_points' => 30, 'unpaid_points' => 30]);
+            ->assertJsonPath('data.active_session.orders', ['count' => 1, 'items_count' => 0, 'total_points' => 30, 'unpaid_points' => 30]);
 
         $this->assertSame([$session->id], app(OutstandingItems::class)->closedFor($member->id)->pluck('id')->all());
     }
@@ -554,7 +558,7 @@ class OrdersOnTheBillTest extends TestCase
         $this->getJson('/api/v1/member/coworking-sessions')
             ->assertOk()
             ->assertJsonPath('data.0.id', $session->id)
-            ->assertJsonPath('data.0.orders', ['count' => 2, 'total_points' => 50, 'unpaid_points' => 30]);
+            ->assertJsonPath('data.0.orders', ['count' => 2, 'items_count' => 0, 'total_points' => 50, 'unpaid_points' => 30]);
     }
 
     /** A room 08:00–09:00, closed, its price covered by the plan. */
@@ -823,7 +827,7 @@ class OrdersOnTheBillTest extends TestCase
         $this->order($booking, 0);
 
         $this->assertNull(app(CurrentBookingLocator::class)->stateOf($booking));
-        $this->assertSame(['count' => 0, 'total_points' => 0, 'unpaid_points' => 0], app(KitchenOrderSettlement::class)->summaryFor($booking));
+        $this->assertSame(['count' => 0, 'items_count' => 0, 'total_points' => 0, 'unpaid_points' => 0], app(KitchenOrderSettlement::class)->summaryFor($booking));
     }
 
     public function test_a_plan_covered_session_owing_orders_ends_unpaid(): void

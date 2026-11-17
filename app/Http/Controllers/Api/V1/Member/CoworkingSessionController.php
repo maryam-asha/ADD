@@ -27,6 +27,7 @@ use App\Http\Requests\Member\PayCoworkingSessionRequest;
 use App\Http\Requests\Member\RequestSessionEndRequest;
 use App\Http\Resources\CoworkingSessionResource;
 use App\Http\Resources\CurrentCoworkingSessionResource;
+use App\Http\Resources\Kitchen\BillKitchenOrdersResource;
 use App\Http\Resources\MemberCoworkingSessionResource;
 use App\Http\Resources\SessionEndRequestResource;
 use App\Services\Realtime\RealtimeBroadcaster;
@@ -75,9 +76,11 @@ class CoworkingSessionController extends Controller
      * decision 11): `closing.points` is the session alone, as sealed;
      * `closing.orders_points` what its accepted orders still owe, and
      * `closing.total_points` the two together — the true total the member
-     * sees before asking to end. `orders` counts them. Only orders the
-     * kitchen has accepted are in it: one still pending that is accepted
-     * later adds to it.
+     * sees before asking to end. `orders` counts them (`count` orders,
+     * `items_count` their items) and lists every order on the session with
+     * its items and status (`orders.list`). Only orders the kitchen has
+     * accepted are in the figures: one still pending that is accepted
+     * later adds to them.
      */
     public function checkout(
         Request $request,
@@ -86,7 +89,6 @@ class CoworkingSessionController extends Controller
         SessionClosureService $closures,
         CheckoutTokenService $checkouts,
         PriceLabelPresenter $prices,
-        KitchenOrderSettlement $orders,
     ): JsonResponse {
         $member = $request->user();
         $session = $sessions->openSessionFor($member);
@@ -117,7 +119,7 @@ class CoworkingSessionController extends Controller
                 'orders_points' => $quote['orders_points'],
                 'total_points' => $points + $quote['orders_points'],
             ],
-            'orders' => $orders->summaryFor($session),
+            'orders' => (new BillKitchenOrdersResource($session))->resolve($request),
             'checkout_token' => $token->token,
             'checkout_token_expires_at' => $token->expiresAt->toIso8601String(),
         ]]);
@@ -159,15 +161,17 @@ class CoworkingSessionController extends Controller
 
         $report = $reports->build($session);
 
-        return response()->json(['data' => (new MemberCoworkingSessionResource($session))->resolve($request)
-            + (new CoworkingSessionResource($session))->resolve($request)
-            + [
-                'termination_source' => $report['session']['termination_source'],
-                'lines' => $report['lines'],
-                'plan' => $report['plan'],
-                'totals' => $report['totals'],
-                'payments' => $this->paymentAttempts($session),
-            ]]);
+        return response()->json(['data' => [
+            ...(new MemberCoworkingSessionResource($session))->resolve($request),
+            ...(new CoworkingSessionResource($session))->resolve($request),
+            'termination_source' => $report['session']['termination_source'],
+            'lines' => $report['lines'],
+            'plan' => $report['plan'],
+            'totals' => $report['totals'],
+            'payments' => $this->paymentAttempts($session),
+            // The card's summary, with every order on it, its items and status.
+            'orders' => (new BillKitchenOrdersResource($session))->resolve($request),
+        ]]);
     }
 
     /** A session that is not the caller's is a 404, not a 403 — its existence is not theirs to learn. */

@@ -198,7 +198,7 @@ class MemberHomeTest extends TestCase
             'end_requested' => false,
             'checked_out_at' => null,
             'payment' => null,
-            'orders' => ['count' => 0, 'total_points' => 0, 'unpaid_points' => 0],
+            'orders' => ['count' => 0, 'items_count' => 0, 'total_points' => 0, 'unpaid_points' => 0],
         ]);
     }
 

@@ -86,19 +86,52 @@ class KitchenOrderSettlement
 
     /**
      * The bill's orders as its cards show them beside its own price: how
-     * many were accepted, what they come to, and what of that is unpaid.
+     * many were accepted (`count` counts orders), how many items those
+     * orders hold (`items_count`, every line's quantity), what they come to,
+     * and what of that is unpaid.
      *
-     * @return array{count: int, total_points: int, unpaid_points: int}
+     * @return array{count: int, items_count: int, total_points: int, unpaid_points: int}
      */
     public function summaryFor(Booking|WalkinSession $bill): array
     {
-        $orders = $this->owedOn($bill);
+        $orders = $this->owed($bill)->withSum('lines', 'quantity')->get();
 
         return [
             'count' => $orders->count(),
+            'items_count' => (int) $orders->sum('lines_sum_quantity'),
             'total_points' => (int) $orders->sum('total_points'),
             'unpaid_points' => (int) $orders->whereNull('paid_at')->sum('total_points'),
         ];
+    }
+
+    /**
+     * summaryFor() of a bill with no orders, for a card that has no bill yet.
+     *
+     * @return array{count: int, items_count: int, total_points: int, unpaid_points: int}
+     */
+    public static function emptySummary(): array
+    {
+        return ['count' => 0, 'items_count' => 0, 'total_points' => 0, 'unpaid_points' => 0];
+    }
+
+    /**
+     * Every order sent to the bill whatever its status — still waiting,
+     * being made, delivered, rejected or cancelled — oldest first, with its
+     * lines and what the member's order view reads, so the bill can show
+     * each order's items and follow its status. Unlike owedOn(), not only
+     * what is owed.
+     *
+     * @return Collection<int, KitchenOrder>
+     */
+    public function allOn(Booking|WalkinSession $bill): Collection
+    {
+        return KitchenOrder::query()
+            ->where('billable_type', $bill->getMorphClass())
+            ->where('billable_id', $bill->id)
+            ->with(['lines.item', 'seatDesk', 'space', 'acceptedPayment'])
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->get();
     }
 
     /**
