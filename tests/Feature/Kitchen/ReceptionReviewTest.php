@@ -13,6 +13,7 @@ use App\Domain\Kitchen\Enums\OrderPaymentChoice;
 use App\Domain\Kitchen\Enums\OrderRoute;
 use App\Domain\Kitchen\Events\KitchenOrderAwaitingReception;
 use App\Domain\Kitchen\Events\KitchenOrderChanged;
+use App\Domain\Kitchen\Events\MemberKitchenOrderUpdated;
 use App\Domain\Kitchen\Models\KitchenOrder;
 use App\Domain\Kitchen\Models\KitchenStore;
 use App\Domain\Membership\Enums\OwnerType;
@@ -260,7 +261,7 @@ class ReceptionReviewTest extends TestCase
         $this->assertSame(60, app(WalletService::class)->generalBalance($wallet));
 
         Sanctum::actingAs($this->staff, ['*']);
-        Event::fake([KitchenOrderAwaitingReception::class]);
+        Event::fake([KitchenOrderAwaitingReception::class, MemberKitchenOrderUpdated::class]);
         Notification::fake();
 
         $this->act($order, 'reject', ['reason' => 'Nobody is at the desk'])
@@ -268,6 +269,11 @@ class ReceptionReviewTest extends TestCase
             ->assertJsonPath('data.status', 'rejected')
             ->assertJsonPath('data.rejection_reason', 'Nobody is at the desk')
             ->assertJsonPath('data.payment.wallet_owner_type', 'user');
+
+        // The member's app hears the rejection over the socket.
+        Event::assertDispatched(MemberKitchenOrderUpdated::class, fn (MemberKitchenOrderUpdated $e) => $e->broadcastAs() === 'kitchen_order.updated'
+            && $e->broadcastWith()['order_id'] === $order->id
+            && $e->broadcastWith()['status'] === 'rejected');
 
         $order->refresh();
         $this->assertSame(KitchenOrderStatus::Rejected, $order->status);

@@ -148,7 +148,7 @@ class KitchenOrderService
             $order->lines()->createMany($priced);
 
             $checkout = $this->payNow($order, $member, $choice, $payment);
-            $this->notifier->arrived($order);
+            $this->notifier->sent($order);
 
             return new PlacedOrder($order->refresh(), $checkout);
         });
@@ -186,7 +186,7 @@ class KitchenOrderService
             // are settled as a choice, so it goes now.
             if (! in_array($choice, [OrderPaymentChoice::Wallet, OrderPaymentChoice::Card], true)) {
                 $locked->releaseFromHold();
-                $this->notifier->arrived($locked);
+                $this->notifier->released($locked);
             }
 
             $checkout = $this->payNow($locked, $member, $choice, $payment);

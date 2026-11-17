@@ -135,7 +135,7 @@ class KitchenRealtimeTest extends TestCase
         return ['type' => $session->getMorphClass(), 'id' => $session->id];
     }
 
-    public function test_placing_broadcasts_to_the_kitchen(): void
+    public function test_placing_broadcasts_to_the_kitchen_and_the_member(): void
     {
         $session = $this->openSession();
         Event::fake(self::EVENTS);
@@ -153,7 +153,23 @@ class KitchenRealtimeTest extends TestCase
         Event::assertDispatched(KitchenOrderChanged::class, fn (KitchenOrderChanged $e) => $this->onChannel($e, 'private-kitchen')
             && $e->broadcastAs() === 'kitchen_order.created'
             && $e->broadcastWith() === ['order_id' => $order->id, 'branch_id' => $this->branch->id, 'status' => 'pending']);
-        Event::assertNotDispatched(MemberKitchenOrderUpdated::class);
+        // The member's app hears it too, so home and the session show it at once.
+        Event::assertDispatchedTimes(MemberKitchenOrderUpdated::class, 1);
+        Event::assertDispatched(MemberKitchenOrderUpdated::class, fn (MemberKitchenOrderUpdated $e) => $this->onChannel($e, "private-member.{$this->member->id}")
+            && $e->broadcastAs() === 'kitchen_order.created'
+            && $e->broadcastWith() === ['order_id' => $order->id, 'status' => 'pending', 'session_type' => 'walkin', 'session_id' => $session->id]);
+    }
+
+    public function test_a_rejection_reaches_the_member(): void
+    {
+        $order = $this->order();
+        Event::fake(self::EVENTS);
+
+        $this->act($order, 'reject', ['reason' => 'Out of ice'])->assertOk();
+
+        Event::assertDispatched(MemberKitchenOrderUpdated::class, fn (MemberKitchenOrderUpdated $e) => $this->onChannel($e, "private-member.{$this->member->id}")
+            && $e->broadcastAs() === 'kitchen_order.updated'
+            && $e->broadcastWith()['status'] === 'rejected');
     }
 
     public function test_a_rolled_back_placing_announces_nothing(): void

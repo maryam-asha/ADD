@@ -111,7 +111,7 @@ class KitchenOrderFulfiller implements PaymentFulfiller
         // Its card went through: out of the hold, on to its route.
         if ($order->status === KitchenOrderStatus::AwaitingPayment) {
             $order->releaseFromHold();
-            $this->notifier->arrived($order);
+            $this->notifier->released($order);
         } elseif ($order->status === KitchenOrderStatus::AwaitingReception
             && $order->payment_choice === OrderPaymentChoice::Cash
             && $payment->collected_via !== PaymentMethod::Cash) {

@@ -6,7 +6,10 @@ use App\Domain\Booking\Events\MemberUpdate;
 use App\Domain\Kitchen\Models\KitchenOrder;
 
 /**
- * The member's order changed status: their app re-fetches it. It names the
+ * The member's order was sent (`kitchen_order.created`) or changed status
+ * (`kitchen_order.updated` — accepted, ready, delivered, rejected, cancelled
+ * by the system, out of its payment hold): their app re-fetches it and the
+ * screens it shows on (member/home, the session). It names the
  * coworking session or booking the order is billed to — `session_type`
  * ('booking' | 'walkin', as `coworking-sessions/{type}/{id}` takes them) and
  * `session_id`, both null for an order with no bill — so the session screen
@@ -23,7 +26,7 @@ class MemberKitchenOrderUpdated extends MemberUpdate
 
     public readonly ?int $sessionId;
 
-    public function __construct(KitchenOrder $order)
+    public function __construct(KitchenOrder $order, public readonly bool $created = false)
     {
         parent::__construct((int) $order->user_id);
 
@@ -35,7 +38,7 @@ class MemberKitchenOrderUpdated extends MemberUpdate
 
     public function broadcastAs(): string
     {
-        return 'kitchen_order.updated';
+        return $this->created ? 'kitchen_order.created' : 'kitchen_order.updated';
     }
 
     public function broadcastWith(): array

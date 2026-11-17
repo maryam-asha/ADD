@@ -45,7 +45,32 @@ class KitchenOrderNotifier
         };
     }
 
-    /** An order reached the kitchen: the board only — the member just sent it. */
+    /**
+     * The member has just sent an order, whatever stage it starts on (held
+     * for its card, at reception, or at the kitchen): their app hears it
+     * (`kitchen_order.created`) so member/home and the session show it at
+     * once, on every device, and whoever first sees it is told (arrived()).
+     */
+    public function sent(KitchenOrder $order): void
+    {
+        $this->realtime->send(new MemberKitchenOrderUpdated($order, created: true));
+
+        $this->arrived($order);
+    }
+
+    /**
+     * A held order is out of its card hold — paid, or another method chosen
+     * — and on to its route: the member's app hears its new status, and
+     * whoever now sees it is told (arrived()).
+     */
+    public function released(KitchenOrder $order): void
+    {
+        $this->realtime->send(new MemberKitchenOrderUpdated($order));
+
+        $this->arrived($order);
+    }
+
+    /** An order reached the kitchen: the board only — the member is told by sent() or released(). */
     public function placed(KitchenOrder $order): void
     {
         $this->realtime->send(new KitchenOrderChanged($order, created: true));
