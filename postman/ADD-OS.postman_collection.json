@@ -5074,13 +5074,13 @@
                                                     "key": "purpose",
                                                     "value": "booking",
                                                     "disabled": true,
-                                                    "description": "wallet_top_up | plan_purchase | booking | booking_extension | coworking_session | event_registration \u2014 keeps only the methods that can pay for it"
+                                                    "description": "wallet_top_up | plan_purchase | booking | booking_extension | coworking_session | event_registration | kitchen_order \u2014 keeps only the methods that can pay for it"
                                                 },
                                                 {
                                                     "key": "payable_id",
                                                     "value": "{{booking_id}}",
                                                     "disabled": true,
-                                                    "description": "with purpose: the member's own record (booking / session / ticket id) \u2014 prices it and says whether each wallet covers it"
+                                                    "description": "with purpose: the member's own record (booking / session / ticket / kitchen order id) \u2014 prices it and says whether each wallet covers it"
                                                 },
                                                 {
                                                     "key": "plan_id",
@@ -5096,7 +5096,7 @@
                                                 }
                                             ]
                                         },
-                                        "description": "The payment methods the member may use: the unavailable ones (`available: false`) first, then in config/payments.php order \u2014 a gateway added in config appears here with no app change.\n\nThe `wallet` method carries the member's points: `balance` (the most they can spend from any wallet they may use) and `wallets` (personal and company, each with `usable_balance`). With nothing to spend it is `available: false` with `reason` \"No balance in your wallet\".\n\nEvery parameter is optional: `purpose` (wallet_top_up | plan_purchase | booking | booking_extension | coworking_session | event_registration) keeps only the methods that can pay for it; with `payable_id` (the member's own record) or `plan_id` it also returns `amount_points`/`price` and whether the wallet covers it. 401 without a member token.\n\n`min_top_up` (only for `purpose=wallet_top_up`, otherwise null): `{points, amount, currency}` \u2014 the smallest top-up (10 points by default, `PAYMENTS_MIN_TOP_UP_POINTS`) and what it costs in the charged currency, as a whole amount (e.g. `\"13840\"`). Show it on the top-up screen.\n\nEvery method also has `hint`: what the member does next when the label alone does not say \u2014 null for every method today (a top-up no longer offers cash, so there is no \"hand the cash to reception\" hint).\n\nThe top-up screen's call (`purpose=wallet_top_up`) is saved under **Wallet \u203a Get Top-up Options**.\n\n`coupon_code` (optional, with `plan_id` or `payable_id`) \u2014 `amount_points`/`price` and whether the wallet covers it are worked out after the code.\n\n`purpose=booking_extension` lists what an extension can be paid by (wallet, cash, card). Nothing is priced \u2014 compare the wallet's `balance` with the chosen `options[].price_points` from extension-options."
+                                        "description": "The payment methods the member may use: the unavailable ones (`available: false`) first, then in config/payments.php order \u2014 a gateway added in config appears here with no app change.\n\nThe `wallet` method carries the member's points: `balance` (the most they can spend from any wallet they may use) and `wallets` (personal and company, each with `usable_balance`). With nothing to spend it is `available: false` with `reason` \"No balance in your wallet\".\n\nEvery parameter is optional: `purpose` (wallet_top_up | plan_purchase | booking | booking_extension | coworking_session | event_registration | kitchen_order) keeps only the methods that can pay for it; with `payable_id` (the member's own record) or `plan_id` it also returns `amount_points`/`price` and whether the wallet covers it. 401 without a member token.\n\n`min_top_up` (only for `purpose=wallet_top_up`, otherwise null): `{points, amount, currency}` \u2014 the smallest top-up (10 points by default, `PAYMENTS_MIN_TOP_UP_POINTS`) and what it costs in the charged currency, as a whole amount (e.g. `\"13840\"`). Show it on the top-up screen.\n\nEvery method also has `hint`: what the member does next when the label alone does not say \u2014 null for every method today (a top-up no longer offers cash, so there is no \"hand the cash to reception\" hint).\n\nThe top-up screen's call (`purpose=wallet_top_up`) is saved under **Wallet \u203a Get Top-up Options**.\n\n`coupon_code` (optional, with `plan_id` or `payable_id`) \u2014 `amount_points`/`price` and whether the wallet covers it are worked out after the code.\n\n`purpose=booking_extension` lists what an extension can be paid by (wallet, cash, card). Nothing is priced \u2014 compare the wallet's `balance` with the chosen `options[].price_points` from extension-options.\n\n**`purpose=kitchen_order`** (added 2026-11-17). `coupon_code` is ignored \u2014 a kitchen order takes no coupon. The answer keeps the shape above; the only addition is a `bill` entry (\"\u0639\u0644\u0649 \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629\") in `methods`. `bill` has no driver: send it only as `payment.method: \"bill\"` on 15. Kitchen \u2192 Send Order, never to another payment endpoint. `paymera` here is `payment.method: \"card\"` on Send Order.\n\n**Before the order is sent \u2014 no `payable_id`.** The same methods Kitchen \u2192 Get Menu offers (both come from one rule), with the wallet's balances; nothing is priced (`amount_points: null`).\n- `bill` \u2014 while the member has a coworking session open or a booking checked in. Which one the order goes on (and so where it is delivered) is chosen from Get Menu's `bills` and sent as `bill: {type, id}` on Send Order; this endpoint does not list them.\n- `cash` \u2014 `available: false` with `reason` \"This order goes straight to the kitchen, so it cannot be paid in cash.\" when the order goes to the kitchen (the member has a bill open or an office); available when it goes to reception.\n\n**An order already sent \u2014 `payable_id={{kitchen_order_id}}`** (the member's own order; anyone else's is 404): `amount_points` is the order's total, and the wallet is weighed from general points only. Mainly for an order held for its card (`status: awaiting_payment`, `next: pay_again`): the methods it can be sent again with on Send Order with `order_id`.\n- `bill` \u2014 only while the order is held for its card and its session or booking is still open.\n- `cash` \u2014 unavailable, with the reason above, for an order held for its card that went to the kitchen rather than to reception."
                                     },
                                     "response": [
                                         {
@@ -5143,6 +5143,112 @@
                                             ],
                                             "cookie": [],
                                             "body": "{\n    \"data\": {\n        \"amount_points\": null,\n        \"price\": null,\n        \"price_point\": null,\n        \"methods\": [\n            {\n                \"key\": \"wallet\",\n                \"label\": \"\u0646\u0642\u0627\u0637 \u0627\u0644\u0645\u062d\u0641\u0638\u0629\",\n                \"available\": true,\n                \"reason\": null,\n                \"hint\": null,\n                \"balance\": 400,\n                \"wallets\": [\n                    {\n                        \"owner_type\": \"user\",\n                        \"owner_id\": 18,\n                        \"owner_label\": \"Personal\",\n                        \"usable_balance\": 400,\n                        \"sufficient\": true\n                    }\n                ]\n            },\n            {\n                \"key\": \"cash\",\n                \"label\": \"\u0646\u0642\u062f\u0627\u064b \u0641\u064a \u0627\u0644\u0627\u0633\u062a\u0642\u0628\u0627\u0644\",\n                \"available\": true,\n                \"reason\": null,\n                \"hint\": null\n            },\n            {\n                \"key\": \"paymera\",\n                \"label\": \"\u0628\u0637\u0627\u0642\u0629\",\n                \"available\": true,\n                \"reason\": null,\n                \"hint\": null\n            }\n        ],\n        \"min_top_up\": null\n    }\n}"
+                                        },
+                                        {
+                                            "name": "Kitchen Order Before Sending (Session Open)",
+                                            "originalRequest": {
+                                                "auth": {
+                                                    "type": "bearer",
+                                                    "bearer": [
+                                                        {
+                                                            "key": "token",
+                                                            "value": "{{member_token}}"
+                                                        }
+                                                    ]
+                                                },
+                                                "method": "GET",
+                                                "header": [
+                                                    {
+                                                        "key": "lang",
+                                                        "value": "{{lang}}",
+                                                        "type": "text"
+                                                    }
+                                                ],
+                                                "url": {
+                                                    "raw": "{{base_url}}/api/v1/member/payment-methods?purpose=kitchen_order",
+                                                    "host": [
+                                                        "{{base_url}}"
+                                                    ],
+                                                    "path": [
+                                                        "api",
+                                                        "v1",
+                                                        "member",
+                                                        "payment-methods"
+                                                    ],
+                                                    "query": [
+                                                        {
+                                                            "key": "purpose",
+                                                            "value": "kitchen_order"
+                                                        }
+                                                    ]
+                                                }
+                                            },
+                                            "status": "OK",
+                                            "code": 200,
+                                            "_postman_previewlanguage": "json",
+                                            "header": [
+                                                {
+                                                    "key": "Content-Type",
+                                                    "value": "application/json"
+                                                }
+                                            ],
+                                            "cookie": [],
+                                            "body": "{\n    \"data\": {\n        \"amount_points\": null,\n        \"price\": null,\n        \"price_point\": null,\n        \"methods\": [\n            {\n                \"key\": \"cash\",\n                \"label\": \"نقداً في الاستقبال\",\n                \"available\": false,\n                \"reason\": \"هذا الطلب يذهب إلى المطبخ مباشرة، لذلك لا يمكن دفعه نقداً.\",\n                \"hint\": null\n            },\n            {\n                \"key\": \"bill\",\n                \"label\": \"على الفاتورة\",\n                \"available\": true,\n                \"reason\": null,\n                \"hint\": null\n            },\n            {\n                \"key\": \"wallet\",\n                \"label\": \"نقاط المحفظة\",\n                \"available\": true,\n                \"reason\": null,\n                \"hint\": null,\n                \"balance\": 400,\n                \"wallets\": [\n                    {\n                        \"owner_type\": \"user\",\n                        \"owner_id\": 18,\n                        \"owner_label\": \"Personal\",\n                        \"usable_balance\": 400,\n                        \"sufficient\": true\n                    }\n                ]\n            },\n            {\n                \"key\": \"paymera\",\n                \"label\": \"بطاقة\",\n                \"available\": true,\n                \"reason\": null,\n                \"hint\": null\n            }\n        ],\n        \"min_top_up\": null\n    }\n}"
+                                        },
+                                        {
+                                            "name": "Kitchen Order Held for Its Card",
+                                            "originalRequest": {
+                                                "auth": {
+                                                    "type": "bearer",
+                                                    "bearer": [
+                                                        {
+                                                            "key": "token",
+                                                            "value": "{{member_token}}"
+                                                        }
+                                                    ]
+                                                },
+                                                "method": "GET",
+                                                "header": [
+                                                    {
+                                                        "key": "lang",
+                                                        "value": "{{lang}}",
+                                                        "type": "text"
+                                                    }
+                                                ],
+                                                "url": {
+                                                    "raw": "{{base_url}}/api/v1/member/payment-methods?purpose=kitchen_order&payable_id={{kitchen_order_id}}",
+                                                    "host": [
+                                                        "{{base_url}}"
+                                                    ],
+                                                    "path": [
+                                                        "api",
+                                                        "v1",
+                                                        "member",
+                                                        "payment-methods"
+                                                    ],
+                                                    "query": [
+                                                        {
+                                                            "key": "purpose",
+                                                            "value": "kitchen_order"
+                                                        },
+                                                        {
+                                                            "key": "payable_id",
+                                                            "value": "{{kitchen_order_id}}"
+                                                        }
+                                                    ]
+                                                }
+                                            },
+                                            "status": "OK",
+                                            "code": 200,
+                                            "_postman_previewlanguage": "json",
+                                            "header": [
+                                                {
+                                                    "key": "Content-Type",
+                                                    "value": "application/json"
+                                                }
+                                            ],
+                                            "cookie": [],
+                                            "body": "{\n    \"data\": {\n        \"amount_points\": 40,\n        \"price\": \"4 $\",\n        \"price_point\": \"40 pts\",\n        \"methods\": [\n            {\n                \"key\": \"cash\",\n                \"label\": \"\u0646\u0642\u062f\u0627\u064b \u0641\u064a \u0627\u0644\u0627\u0633\u062a\u0642\u0628\u0627\u0644\",\n                \"available\": false,\n                \"reason\": \"\u0647\u0630\u0627 \u0627\u0644\u0637\u0644\u0628 \u064a\u0630\u0647\u0628 \u0625\u0644\u0649 \u0627\u0644\u0645\u0637\u0628\u062e \u0645\u0628\u0627\u0634\u0631\u0629\u060c \u0644\u0630\u0644\u0643 \u0644\u0627 \u064a\u0645\u0643\u0646 \u062f\u0641\u0639\u0647 \u0646\u0642\u062f\u0627\u064b.\",\n                \"hint\": null\n            },\n            {\n                \"key\": \"bill\",\n                \"label\": \"\u0639\u0644\u0649 \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629\",\n                \"available\": true,\n                \"reason\": null,\n                \"hint\": null\n            },\n            {\n                \"key\": \"wallet\",\n                \"label\": \"\u0646\u0642\u0627\u0637 \u0627\u0644\u0645\u062d\u0641\u0638\u0629\",\n                \"available\": true,\n                \"reason\": null,\n                \"hint\": null,\n                \"balance\": 400,\n                \"wallets\": [\n                    {\n                        \"owner_type\": \"user\",\n                        \"owner_id\": 18,\n                        \"owner_label\": \"Personal\",\n                        \"usable_balance\": 400,\n                        \"sufficient\": true\n                    }\n                ]\n            },\n            {\n                \"key\": \"paymera\",\n                \"label\": \"\u0628\u0637\u0627\u0642\u0629\",\n                \"available\": true,\n                \"reason\": null,\n                \"hint\": null\n            }\n        ],\n        \"min_top_up\": null\n    }\n}"
                                         }
                                     ]
                                 },

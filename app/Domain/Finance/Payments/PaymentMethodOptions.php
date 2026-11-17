@@ -9,8 +9,10 @@ use App\Domain\Finance\Payments\Methods\CashMethod;
 use App\Domain\Finance\Payments\Methods\WalletMethod;
 use App\Domain\Identity\Models\User;
 use App\Domain\Kitchen\Enums\KitchenOrderStatus;
+use App\Domain\Kitchen\Enums\OrderPaymentChoice;
 use App\Domain\Kitchen\Enums\OrderRoute;
 use App\Domain\Kitchen\Models\KitchenOrder;
+use App\Domain\Kitchen\Services\OrderRouting;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Domain\Membership\Models\Plan;
@@ -44,6 +46,7 @@ class PaymentMethodOptions
         private readonly FulfillerRegistry $fulfillers,
         private readonly PaymentService $payments,
         private readonly WalletService $wallets,
+        private readonly OrderRouting $routing,
     ) {}
 
     /**
@@ -59,6 +62,7 @@ class PaymentMethodOptions
         // `$points`: a price the caller already quoted — with a coupon the
         // member is about to use (CouponPreview).
         $points ??= $this->pointsDue($purpose, $member, $payable, $plan);
+        $newOrder = $this->newKitchenOrderMethods($purpose, $member, $payable);
 
         $methods = [];
 
@@ -77,7 +81,7 @@ class PaymentMethodOptions
                 $option['available'] = false;
                 $option['reason'] = __('api.payment.session_in_progress');
                 $option['hint'] = __('api.payment.session_in_progress_hint');
-            } elseif ($key === CashMethod::KEY && $this->heldOffTheReceptionRoute($payable)) {
+            } elseif ($key === CashMethod::KEY && ($this->heldOffTheReceptionRoute($payable) || ($newOrder !== null && ! in_array(OrderPaymentChoice::Cash->value, $newOrder, true)))) {
                 $option['available'] = false;
                 $option['reason'] = __('api.payment.kitchen_order_no_cash');
             } elseif ($key === WalletMethod::KEY) {
@@ -87,7 +91,7 @@ class PaymentMethodOptions
             $methods[] = $option;
         }
 
-        if ($this->billCanTakeIt($payable)) {
+        if ($this->billCanTakeIt($payable) || ($newOrder !== null && in_array(OrderPaymentChoice::Bill->value, $newOrder, true))) {
             array_unshift($methods, ['key' => self::BILL, 'label' => __('api.payment.methods.bill'), 'available' => true, 'reason' => null, 'hint' => null]);
         }
 
@@ -116,6 +120,24 @@ class PaymentMethodOptions
         return $payable instanceof Booking
             && $payable->checked_in_at !== null
             && $payable->checked_out_at === null;
+    }
+
+    /**
+     * A kitchen order not sent yet (no `payable_id`): the methods the kitchen
+     * menu offers (OrderRouting, the one source of both lists) — `bill`
+     * while the member has a session or checked-in booking open, `cash` on
+     * the reception route only. Which bill, and so where the order goes, is
+     * the menu's `bills`; null for anything else.
+     *
+     * @return list<string>|null
+     */
+    private function newKitchenOrderMethods(?PaymentPurpose $purpose, ?User $member, ?Model $payable): ?array
+    {
+        if ($purpose !== PaymentPurpose::KitchenOrder || $member === null || $payable !== null) {
+            return null;
+        }
+
+        return $this->routing->for($member, null, null)->methods;
     }
 
     /**

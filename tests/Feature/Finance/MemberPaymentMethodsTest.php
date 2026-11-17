@@ -5,7 +5,9 @@ namespace Tests\Feature\Finance;
 use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Finance\Payments\Methods\PaymeraGateway;
+use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
 use App\Domain\Kitchen\Enums\KitchenOrderStatus;
@@ -330,6 +332,39 @@ class MemberPaymentMethodsTest extends TestCase
 
             $this->assertNotContains('bill', $keys);
         }
+    }
+
+    /**
+     * Before the order is sent (no payable_id): the same methods the kitchen
+     * menu offers — the bill while a session is open, and no cash on the
+     * kitchen route. Which bill is the menu's `bills`; nothing is priced.
+     */
+    public function test_a_new_order_with_a_session_open_offers_the_bill_and_no_cash(): void
+    {
+        $member = $this->member(300);
+        WalkinSession::factory()->create(['user_id' => $member->id, 'space_id' => Space::factory()->create()->id]);
+
+        $response = $this->methods(['purpose' => 'kitchen_order'])
+            ->assertOk()
+            ->assertJsonPath('data.amount_points', null);
+        $methods = collect($response->json('data.methods'));
+
+        $this->assertSame(['cash', 'bill', 'wallet', 'paymera'], $methods->pluck('key')->all());
+        $this->assertFalse($methods->firstWhere('key', 'cash')['available']);
+        $this->assertSame(__('api.payment.kitchen_order_no_cash', [], 'en'), $methods->firstWhere('key', 'cash')['reason']);
+        $this->assertTrue($methods->firstWhere('key', 'bill')['available']);
+        // The response keeps its shape: no list of bills here.
+        $this->assertSame(['amount_points', 'price', 'price_point', 'methods', 'min_top_up'], array_keys($response->json('data')));
+    }
+
+    public function test_a_new_order_with_nothing_open_has_no_bill_and_takes_cash(): void
+    {
+        $this->member(300);
+
+        $methods = collect($this->methods(['purpose' => 'kitchen_order'])->assertOk()->json('data.methods'));
+
+        $this->assertSame(['wallet', 'cash', 'paymera'], $methods->pluck('key')->all());
+        $this->assertTrue($methods->firstWhere('key', 'cash')['available']);
     }
 
     public function test_no_bill_for_any_other_purpose(): void
