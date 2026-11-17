@@ -30,8 +30,8 @@ class ExpireStaleKitchenOrders extends Command
 
     public function handle(KitchenOrderService $orders, LastWordFromTheGateway $gateway): int
     {
-        $reception = (int) config('kitchen.reception_window_minutes');
-        $accept = (int) config('kitchen.accept_window_minutes');
+        $reception = (int) config('kitchen.reception_window_minutes', 15);
+        $accept = (int) config('kitchen.accept_window_minutes', 15);
 
         $counts = [
             'payment' => $this->sweep(

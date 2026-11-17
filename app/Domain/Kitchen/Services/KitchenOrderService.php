@@ -376,10 +376,10 @@ class KitchenOrderService
                 && $order->payment_due_at->lte(now()),
             'reception' => $order->status === KitchenOrderStatus::AwaitingReception
                 && $order->reached_reception_at !== null
-                && $order->reached_reception_at->lte(now()->subMinutes((int) config('kitchen.reception_window_minutes'))),
+                && $order->reached_reception_at->lte(now()->subMinutes((int) config('kitchen.reception_window_minutes', 15))),
             'kitchen' => $order->status === KitchenOrderStatus::Pending
                 && $order->reached_kitchen_at !== null
-                && $order->reached_kitchen_at->lte(now()->subMinutes((int) config('kitchen.accept_window_minutes'))),
+                && $order->reached_kitchen_at->lte(now()->subMinutes((int) config('kitchen.accept_window_minutes', 15))),
             default => false,
         };
     }
