@@ -1,0 +1,230 @@
+<?php
+
+namespace Tests\Feature\Ecosystem;
+
+use App\Domain\Ecosystem\Models\Announcement;
+use App\Domain\Identity\Models\User;
+use Database\Seeders\RoleSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
+use Tests\TestCase;
+
+class AnnouncementTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(RoleSeeder::class);
+    }
+
+    private function actingAsAdmin(): User
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        return $admin;
+    }
+
+    public function test_admin_can_create_an_announcement_with_real_defaults(): void
+    {
+        $this->actingAsAdmin();
+
+        $response = $this->postJson('/api/v1/admin/announcements', [
+            'type' => 'offer',
+            'image_url' => 'https://example.com/offer.png',
+            'link_url' => 'https://example.com/offer',
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('data.sort_order', 0);
+        $response->assertJsonPath('data.is_active', true);
+        $this->assertDatabaseHas('announcements', [
+            'type' => 'offer',
+            'sort_order' => 0,
+            'is_active' => 1,
+        ]);
+    }
+
+    public function test_a_null_sort_order_or_is_active_falls_back_to_the_defaults(): void
+    {
+        $this->actingAsAdmin();
+
+        $id = $this->postJson('/api/v1/admin/announcements', [
+            'type' => 'event',
+            'image_url' => 'https://example.com/event.png',
+            'sort_order' => null,
+            'is_active' => null,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.sort_order', 0)
+            ->assertJsonPath('data.is_active', true)
+            ->json('data.id');
+
+        Announcement::whereKey($id)->update(['sort_order' => 4]);
+
+        $this->patchJson("/api/v1/admin/announcements/{$id}", [
+            'type' => 'event',
+            'image_url' => 'https://example.com/event.png',
+            'sort_order' => null,
+            'is_active' => null,
+        ])->assertOk();
+
+        $this->assertDatabaseHas('announcements', ['id' => $id, 'sort_order' => 4, 'is_active' => 1]);
+    }
+
+    public function test_a_type_outside_the_closed_set_is_rejected(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/admin/announcements', [
+            'type' => 'holiday_hours',
+            'image_url' => 'https://example.com/holiday.png',
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('type');
+    }
+
+    public function test_it_is_placed_on_every_screen_unless_told_otherwise_and_never_on_none(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/admin/announcements', [
+            'type' => 'news',
+            'image_url' => 'https://example.com/news.png',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.placement', 'all');
+
+        $this->postJson('/api/v1/admin/announcements', [
+            'type' => 'news',
+            'image_url' => 'https://example.com/news.png',
+            'placement' => 'app',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.placement', 'app');
+
+        $this->postJson('/api/v1/admin/announcements', [
+            'type' => 'news',
+            'image_url' => 'https://example.com/news.png',
+            'placement' => null,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('placement');
+    }
+
+    public function test_the_text_drawn_over_the_image_is_stored_in_both_languages(): void
+    {
+        $this->actingAsAdmin();
+
+        $response = $this->postJson('/api/v1/admin/announcements', [
+            'type' => 'offer',
+            'image_url' => 'https://example.com/offer.png',
+            'link_url' => 'https://example.com/explore',
+            'subtitle' => ['en' => 'ADD Smart Ecosystem', 'ar' => 'منظومة ADD الذكية'],
+            'title' => ['en' => 'Build. Connect. Grow.', 'ar' => 'ابن. تواصل. انمُ.'],
+            'description' => ['en' => 'Everything your business needs.', 'ar' => 'كل ما يحتاجه عملك.'],
+            'cta_label' => ['en' => 'Explore ADD', 'ar' => 'استكشف ADD'],
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('data.title.en', 'Build. Connect. Grow.');
+        $response->assertJsonPath('data.title.ar', 'ابن. تواصل. انمُ.');
+        $response->assertJsonPath('data.cta_label.ar', 'استكشف ADD');
+        $this->assertSame('ADD Smart Ecosystem', Announcement::query()->sole()->subtitle['en']);
+    }
+
+    public function test_options_lists_every_type_and_placement_with_its_label(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->withHeader('lang', 'en')
+            ->getJson('/api/v1/admin/announcements/options')
+            ->assertOk()
+            ->assertExactJson(['data' => [
+                'types' => [
+                    ['key' => 'offer', 'label' => 'Offer'],
+                    ['key' => 'event', 'label' => 'Event'],
+                    ['key' => 'news', 'label' => 'News'],
+                ],
+                'placements' => [
+                    ['key' => 'kiosk', 'label' => 'Reception kiosk'],
+                    ['key' => 'app', 'label' => 'Member app'],
+                    ['key' => 'all', 'label' => 'Kiosk and app'],
+                ],
+            ]]);
+    }
+
+    public function test_end_date_before_start_date_is_rejected(): void
+    {
+        $this->actingAsAdmin();
+
+        $response = $this->postJson('/api/v1/admin/announcements', [
+            'type' => 'event',
+            'image_url' => 'https://example.com/event.png',
+            'starts_at' => now()->addDays(5)->toIso8601String(),
+            'ends_at' => now()->addDays(1)->toIso8601String(),
+        ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors('ends_at');
+    }
+
+    public function test_operations_can_list_admin_can_update_and_delete(): void
+    {
+        $operations = User::factory()->create();
+        $operations->assignRole('operations');
+        Sanctum::actingAs($operations, ['*']);
+
+        $announcement = Announcement::factory()->create(['sort_order' => 0]);
+
+        $this->getJson('/api/v1/admin/announcements')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $announcement->id);
+
+        $this->actingAsAdmin();
+
+        $this->withHeader('lang', 'en')
+            ->putJson("/api/v1/admin/announcements/{$announcement->id}", [
+                'type' => $announcement->type->value,
+                'image_url' => 'https://example.com/new.png',
+                'is_active' => false,
+            ])
+            ->assertOk()
+            ->assertExactJson(['message' => 'Announcement updated.']);
+
+        $this->assertDatabaseHas('announcements', [
+            'id' => $announcement->id,
+            'image_url' => 'https://example.com/new.png',
+            'is_active' => 0,
+        ]);
+
+        $this->deleteJson("/api/v1/admin/announcements/{$announcement->id}")->assertNoContent();
+        $this->assertDatabaseMissing('announcements', ['id' => $announcement->id]);
+    }
+
+    public function test_admin_index_orders_by_sort_order_not_insertion_order(): void
+    {
+        $this->actingAsAdmin();
+
+        $second = Announcement::factory()->create(['sort_order' => 2]);
+        $first = Announcement::factory()->create(['sort_order' => 1]);
+
+        $response = $this->getJson('/api/v1/admin/announcements');
+
+        $response->assertOk();
+        $response->assertJsonPath('data.0.id', $first->id);
+        $response->assertJsonPath('data.1.id', $second->id);
+    }
+
+    public function test_a_member_cannot_manage_announcements(): void
+    {
+        $member = User::factory()->create();
+        $member->assignRole('member');
+        Sanctum::actingAs($member, ['*']);
+
+        $this->getJson('/api/v1/admin/announcements')->assertForbidden();
+    }
+}

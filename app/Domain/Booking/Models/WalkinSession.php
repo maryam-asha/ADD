@@ -1,0 +1,170 @@
+<?php
+
+namespace App\Domain\Booking\Models;
+
+use App\Casts\PlainDecimal;
+use App\Concerns\HasReference;
+use App\Domain\Booking\Concerns\HasSessionActivity;
+use App\Domain\Booking\Enums\PaymentSource;
+use App\Domain\Booking\Enums\PaymentState;
+use App\Domain\Booking\Enums\SessionStartSource;
+use App\Domain\Booking\Enums\TerminationSource;
+use App\Domain\Finance\Enums\PaymentMethod;
+use App\Domain\Finance\Models\Payment;
+use App\Domain\Foundation\Models\Space;
+use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Models\Membership;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+
+class WalkinSession extends Model
+{
+    use HasFactory, HasReference, HasSessionActivity;
+
+    protected $fillable = [
+        'reference',
+        'space_id',
+        'user_id',
+        'guest_visit_id',
+        'membership_id',
+        'seat_covered',
+        'checked_in_at',
+        'started_via',
+        'kiosk_id',
+        'handover_booking_id',
+        'accepted_uncovered',
+        'coverage_snapshot',
+        'checked_out_at',
+        'plan_covered_seconds',
+        'payment_state',
+        'payment_source',
+        'termination_source',
+        'amount_owed',
+        'price_points',
+        'list_price_points',
+        'currency',
+        'payment_method',
+        'paid_by',
+        'paid_at',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'checked_in_at' => 'datetime',
+            'checked_out_at' => 'datetime',
+            'payment_state' => PaymentState::class,
+            'payment_source' => PaymentSource::class,
+            'termination_source' => TerminationSource::class,
+            'amount_owed' => PlainDecimal::class,
+            'price_points' => 'integer',
+            'list_price_points' => 'integer',
+            'plan_covered_seconds' => 'integer',
+            'seat_covered' => 'boolean',
+            'payment_method' => PaymentMethod::class,
+            'paid_at' => 'datetime',
+            'started_via' => SessionStartSource::class,
+            'accepted_uncovered' => 'boolean',
+            'coverage_snapshot' => 'array',
+        ];
+    }
+
+    /**
+     * "WS-2026-00041" (HasReference).
+     */
+    protected function referencePrefix(): string
+    {
+        return 'WS';
+    }
+
+    /** Checked in and not yet out: someone is inside on it now. */
+    /**
+     * The person's own sessions: not a guest's billed to them as host
+     * (`guest_visit_id`), whose user_id is the payer, not who sat there.
+     */
+    public function scopeOwn(Builder $query): Builder
+    {
+        return $query->whereNull('guest_visit_id');
+    }
+
+    /** A guest's session billed to their host (GuestVisitService::convert()). */
+    public function isGuestSession(): bool
+    {
+        return $this->guest_visit_id !== null;
+    }
+
+    public function guestVisit(): BelongsTo
+    {
+        return $this->belongsTo(GuestVisit::class);
+    }
+
+    public function scopeOpen(Builder $query): Builder
+    {
+        return $query->whereNotNull('checked_in_at')->whereNull('checked_out_at');
+    }
+
+    public function space(): BelongsTo
+    {
+        return $this->belongsTo(Space::class);
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    /**
+     * The membership in force when this session started, stamped at check-in
+     * so a later change to the member's subscription cannot rewrite an
+     * already-running session's bill. Null for a walk-in by someone with no
+     * active membership — the ordinary case.
+     */
+    public function membership(): BelongsTo
+    {
+        return $this->belongsTo(Membership::class);
+    }
+
+    public function kiosk(): BelongsTo
+    {
+        return $this->belongsTo(Kiosk::class);
+    }
+
+    /**
+     * The coworking booking this early walk-in becomes when it starts
+     * (coworking:hand-over-early-sessions). Null for every other walk-in.
+     */
+    public function handoverBooking(): BelongsTo
+    {
+        return $this->belongsTo(Booking::class, 'handover_booking_id');
+    }
+
+    /** Every payment made for this session, so a list can eager-load its payment state. */
+    public function payments(): MorphMany
+    {
+        return $this->morphMany(Payment::class, 'payable');
+    }
+
+    public function coworkingType(): string
+    {
+        return 'walkin';
+    }
+
+    /**
+     * What a notice about this session names as its object (its morph
+     * alias), so the app and the dashboard open this walk-in session.
+     *
+     * @return array{target_type: string, target_id: string}
+     */
+    public function notificationTarget(): array
+    {
+        return ['target_type' => 'walkin_session', 'target_id' => (string) $this->id];
+    }
+
+    public function startSource(): SessionStartSource
+    {
+        return $this->started_via ?? SessionStartSource::Reception;
+    }
+}

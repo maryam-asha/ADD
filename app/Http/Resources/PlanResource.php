@@ -1,0 +1,146 @@
+<?php
+
+namespace App\Http\Resources;
+
+use App\Domain\Finance\Services\CurrencyConversionService;
+use App\Domain\Finance\Services\CurrencyResolver;
+use App\Domain\Finance\Services\PointConversionService;
+use App\Domain\Pricing\Services\PlanSavingCalculator;
+use App\Support\PlainAmount;
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+use Symfony\Component\HttpKernel\Exception\HttpException;
+
+class PlanResource extends JsonResource
+{
+    /**
+     * @return array<string, mixed>
+     */
+    public function toArray(Request $request): array
+    {
+        $data = [
+            'id' => $this->id,
+            'plan_module_id' => $this->plan_module_id,
+            'plan_module' => $this->whenLoaded('planModule', fn () => [
+                'id' => $this->planModule->id,
+                'name' => $this->planModule->name,
+                'slug' => $this->planModule->slug,
+                'icon' => $this->planModule->icon,
+            ]),
+            'name' => $this->name,
+            'subtitle' => $this->subtitle,
+            'is_subscription' => $this->is_subscription,
+            'duration_days' => $this->duration_days,
+            // Whether and how it includes coworking; hours null is unlimited.
+            'coworking_seat' => $this->coworking_seat?->value,
+            'coworking_hours' => $this->coworking_hours,
+            'allowance_cycle' => $this->allowance_cycle?->value,
+            'access_window_start' => $this->access_window_start,
+            'access_window_end' => $this->access_window_end,
+            'is_active' => $this->is_active,
+            'is_public' => $this->is_public,
+            'order' => $this->order,
+            'reference_plan_id' => $this->reference_plan_id,
+            'reference_space_id' => $this->reference_space_id,
+            'reference_units' => $this->reference_units,
+            // What it saves against its reference — dashboard only; members
+            // read it as labels (PackageBrowseService).
+            'saving' => $this->when($request->is('api/v1/admin/*'), fn () => app(PlanSavingCalculator::class)->for($this->resource)?->toArray()),
+            'balances' => $this->whenLoaded('balances', fn () => $this->balances->map(fn ($b) => [
+                'id' => $b->id,
+                'category' => $b->category->value,
+                'amount_points' => (int) $b->amount_points,
+                'restricted_space_id' => $b->restricted_space_id,
+                'description' => $b->description,
+                'order' => $b->order,
+            ])),
+            'features' => $this->whenLoaded('features', fn () => $this->features->map(fn ($f) => [
+                'id' => $f->id,
+                'name' => $f->name,
+                'value' => $f->value,
+                'icon' => $f->icon,
+                'is_included' => $f->is_included,
+                'order' => $f->order,
+            ])),
+            'space_hours' => $this->whenLoaded('spaceHours', fn () => $this->spaceHours->map(fn ($h) => [
+                'id' => $h->id,
+                'space_id' => $h->space_id,
+                'space_type' => $h->space_type?->value,
+                'hours' => $h->hours,
+                'description' => $h->description,
+                'order' => $h->order,
+            ])->values()),
+            'discounts' => $this->whenLoaded('discounts', fn () => $this->discounts->map(fn ($d) => [
+                'id' => $d->id,
+                'percentage' => (int) $d->percentage,
+                'space_id' => $d->space_id,
+                'space_type' => $d->space_type?->value,
+                'usage_limit' => $d->usage_limit,
+                'description' => $d->description,
+                'is_active' => $d->is_active,
+                'order' => $d->order,
+            ])),
+            'resource_grants' => $this->whenLoaded('resourceGrants', fn () => $this->resourceGrants->map(fn ($g) => [
+                'id' => $g->id,
+                'resource_type_id' => $g->resource_type_id,
+                'resource_type' => $g->relationLoaded('resourceType') && $g->resourceType ? [
+                    'id' => $g->resourceType->id,
+                    'slug' => $g->resourceType->slug,
+                    'name' => $g->resourceType->name,
+                    'unit_label' => $g->resourceType->unit_label,
+                    'icon' => $g->resourceType->icon,
+                ] : null,
+                'quantity' => (float) $g->quantity,
+                'description' => $g->description,
+                'order' => $g->order,
+            ])),
+            'created_at' => $this->created_at,
+        ];
+
+        // Resolved directly from the guard, not the route — this lets
+        // conversion opportunistically activate even on public routes with
+        // no auth:sanctum middleware, as long as a valid bearer token is
+        // sent (Unit 1 design, 2026-08-09). Resolving the guard fires
+        // Sanctum's TokenAuthenticated event, which
+        // EnsureAuthenticatedUserIsActive listens to and aborts (403) for a
+        // suspended/blocked account — never intended to affect this
+        // opportunistic, otherwise-always-200 public listing, so that abort
+        // is treated the same as "no user resolvable for conversion".
+        try {
+            $user = $request->user('sanctum');
+        } catch (HttpException) {
+            $user = null;
+        }
+
+        // price_points is the authoritative stored value; price_usd and
+        // price_display are derived per request from the point rate and the
+        // resolved target currency (docs/superpowers/specs/2026-09-12-add-point-system-design.md).
+        $points = app(PointConversionService::class);
+        $targetCurrency = app(CurrencyResolver::class)->resolve($request, $user);
+        $baseCurrency = app(CurrencyConversionService::class)->baseCurrencyCode();
+
+        $convertedDisplay = PlainAmount::of($points->pointsToCurrency((int) $this->price_points, $targetCurrency));
+
+        $data['price_points'] = (int) $this->price_points;
+        $data['price_usd'] = PlainAmount::of($points->pointsToUsd((int) $this->price_points));
+        $data['price_display'] = $convertedDisplay ?? $data['price_usd'];
+        $data['currency'] = $targetCurrency;
+
+        // Deprecated: superseded by price_display/currency above, which
+        // this pair simply mirrors — kept for one release only because the
+        // member app may still read the old names (docs/superpowers/specs/
+        // 2026-09-12-add-point-b-pricing-design.md §3). Emitted only when
+        // the resolved currency differs from base AND actually converted
+        // (i.e. an exchange rate exists), matching the original
+        // pre-points behaviour. Deliberately NOT computed on a separate
+        // conversion path: both fields are read straight off the
+        // price_display/currency values already derived above, so they
+        // cannot drift from them. Remove after one release.
+        if ($targetCurrency !== $baseCurrency && $convertedDisplay !== null) {
+            $data['converted_amount'] = $data['price_display'];
+            $data['converted_currency'] = $data['currency'];
+        }
+
+        return $data;
+    }
+}

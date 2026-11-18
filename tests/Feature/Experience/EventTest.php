@@ -1,0 +1,546 @@
+<?php
+
+namespace Tests\Feature\Experience;
+
+use App\Domain\Experience\Models\Event;
+use App\Domain\Experience\Models\EventCategory;
+use App\Domain\Finance\Enums\ExchangeRateSource;
+use App\Domain\Finance\Models\ExchangeRate;
+use App\Domain\Foundation\Models\Branch;
+use App\Domain\Foundation\Models\Building;
+use App\Domain\Foundation\Models\Space;
+use App\Domain\Identity\Models\User;
+use Database\Seeders\RoleSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
+use Tests\TestCase;
+
+class EventTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(RoleSeeder::class);
+    }
+
+    private function actingAsAdmin(): User
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        return $admin;
+    }
+
+    public function test_admin_can_create_event(): void
+    {
+        $this->actingAsAdmin();
+
+        $category = EventCategory::create([
+            'name' => ['en' => 'Workshops', 'ar' => 'ورش عمل'],
+            'slug' => 'workshops',
+        ]);
+
+        $response = $this->postJson('/api/v1/admin/events', [
+            'title' => ['en' => 'Tech Talk', 'ar' => 'حديث تقني'],
+            'description' => ['en' => 'All about AI', 'ar' => 'كل شيء عن الذكاء الاصطناعي'],
+            'category_id' => $category->id,
+            'start_at' => now()->addDays(2)->toDateTimeString(),
+            'end_at' => now()->addDays(2)->addHours(2)->toDateTimeString(),
+            'location' => 'Main Hall',
+            'capacity' => 50,
+            'status' => 'published',
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('data.title.en', 'Tech Talk');
+        $response->assertJsonPath('data.capacity', 50);
+        $response->assertJsonPath('data.category_id', $category->id);
+        $response->assertJsonPath('data.category.slug', 'workshops');
+
+        $this->assertDatabaseHas('events', [
+            'category_id' => $category->id,
+            'location' => 'Main Hall',
+            'status' => 'published',
+            'capacity' => 50,
+        ]);
+    }
+
+    public function test_explicit_nulls_for_not_null_columns_fall_back_to_their_defaults(): void
+    {
+        $this->actingAsAdmin();
+
+        $response = $this->postJson('/api/v1/admin/events', [
+            'title' => ['en' => 'Flutter Course', 'ar' => 'كورس فلاتر'],
+            'start_at' => now()->addDays(2)->toDateTimeString(),
+            'end_at' => now()->addDays(4)->toDateTimeString(),
+            'order' => null,
+            'status' => null,
+            'is_free' => null,
+            'price_points' => null,
+            'requires_approval' => null,
+        ]);
+
+        $response->assertCreated();
+        $event = Event::findOrFail($response->json('data.id'));
+        $this->assertSame(0, $event->order);
+        $this->assertSame('draft', $event->status);
+
+        $event->update(['order' => 5, 'status' => 'published']);
+
+        $this->putJson("/api/v1/admin/events/{$event->id}", [
+            'title' => ['en' => 'Flutter Course', 'ar' => 'كورس فلاتر'],
+            'start_at' => now()->addDays(2)->toDateTimeString(),
+            'end_at' => now()->addDays(4)->toDateTimeString(),
+            'order' => null,
+            'status' => null,
+        ])->assertOk();
+
+        $this->assertSame(5, $event->fresh()->order);
+        $this->assertSame('published', $event->fresh()->status);
+    }
+
+    public function test_admin_cannot_create_event_with_non_existent_category_id(): void
+    {
+        $this->actingAsAdmin();
+
+        $response = $this->postJson('/api/v1/admin/events', [
+            'title' => ['en' => 'Invalid Event', 'ar' => 'فعالية غير صالحة'],
+            'category_id' => 99999,
+            'start_at' => now()->addDays(1)->toDateTimeString(),
+            'end_at' => now()->addDays(1)->addHours(2)->toDateTimeString(),
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['category_id']);
+    }
+
+    public function test_deleting_event_category_nullifies_event_category_id(): void
+    {
+        $this->actingAsAdmin();
+
+        $category = EventCategory::create([
+            'name' => ['en' => 'Temp Cat', 'ar' => 'فئة مؤقتة'],
+            'slug' => 'temp-cat',
+        ]);
+
+        $event = Event::create([
+            'title' => ['en' => 'Cat Event', 'ar' => 'فعالية فئة'],
+            'category_id' => $category->id,
+            'start_at' => now()->addDays(1),
+            'end_at' => now()->addDays(1)->addHours(2),
+        ]);
+
+        $this->assertEquals($category->id, $event->fresh()->category_id);
+
+        $category->delete();
+
+        $this->assertNull($event->fresh()->category_id);
+    }
+
+    public function test_admin_can_update_event(): void
+    {
+        $this->actingAsAdmin();
+
+        $event = Event::create([
+            'title' => ['en' => 'Old Title', 'ar' => 'عنوان قديم'],
+            'start_at' => now()->addDays(1),
+            'end_at' => now()->addDays(1)->addHours(1),
+            'status' => 'draft',
+        ]);
+
+        $response = $this->withHeader('lang', 'en')->putJson("/api/v1/admin/events/{$event->id}", [
+            'title' => ['en' => 'Updated Title', 'ar' => 'عنوان محدث'],
+            'start_at' => now()->addDays(1)->toDateTimeString(),
+            'end_at' => now()->addDays(1)->addHours(2)->toDateTimeString(),
+            'status' => 'published',
+        ]);
+
+        $response->assertOk();
+        $response->assertJson(['message' => 'Event updated.']);
+
+        $this->assertEquals('Updated Title', $event->fresh()->translate('title', 'en'));
+        $this->assertEquals('published', $event->fresh()->status);
+    }
+
+    public function test_admin_can_delete_event(): void
+    {
+        $this->actingAsAdmin();
+
+        $event = Event::create([
+            'title' => ['en' => 'To Delete', 'ar' => 'للحذف'],
+            'start_at' => now()->addDays(1),
+            'end_at' => now()->addDays(1)->addHours(1),
+        ]);
+
+        $response = $this->deleteJson("/api/v1/admin/events/{$event->id}");
+
+        $response->assertNoContent();
+        $this->assertDatabaseMissing('events', ['id' => $event->id]);
+    }
+
+    public function test_public_can_only_view_published_events(): void
+    {
+        Event::create([
+            'title' => ['en' => 'Draft Event', 'ar' => 'مسودة'],
+            'start_at' => now()->addDays(1),
+            'end_at' => now()->addDays(1)->addHours(1),
+            'status' => 'draft',
+        ]);
+
+        Event::create([
+            'title' => ['en' => 'Published Event', 'ar' => 'منشور'],
+            'start_at' => now()->addDays(2),
+            'end_at' => now()->addDays(2)->addHours(1),
+            'status' => 'published',
+        ]);
+
+        $response = $this->withHeaders(['lang' => 'en'])->getJson('/api/v1/events');
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'data');
+        $response->assertJsonPath('data.0.title', 'Published Event');
+    }
+
+    public function test_admin_can_create_paid_event(): void
+    {
+        $this->actingAsAdmin();
+
+        $response = $this->postJson('/api/v1/admin/events', [
+            'title' => ['en' => 'Paid Masterclass', 'ar' => 'دورة متقدمة مدفوعة'],
+            'start_at' => now()->addDays(3)->toDateTimeString(),
+            'end_at' => now()->addDays(3)->addHours(2)->toDateTimeString(),
+            'is_free' => false,
+            'price_points' => 150,
+            'status' => 'published',
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('data.is_free', false);
+        $response->assertJsonPath('data.price_points', 150);
+        $response->assertJsonPath('data.price_usd', '15');
+
+        $this->assertDatabaseHas('events', [
+            'is_free' => false,
+            'price_points' => 150,
+        ]);
+    }
+
+    public function test_admin_can_create_free_event(): void
+    {
+        $this->actingAsAdmin();
+
+        $response = $this->postJson('/api/v1/admin/events', [
+            'title' => ['en' => 'Community Gathering', 'ar' => 'لقاء مجتمعي'],
+            'start_at' => now()->addDays(4)->toDateTimeString(),
+            'end_at' => now()->addDays(4)->addHours(2)->toDateTimeString(),
+            'is_free' => true,
+            'price_points' => 0,
+            'status' => 'published',
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('data.is_free', true);
+        $response->assertJsonPath('data.price_points', 0);
+        $response->assertJsonPath('data.price_usd', '0');
+
+        $this->assertDatabaseHas('events', [
+            'is_free' => true,
+            'price_points' => 0,
+        ]);
+    }
+
+    public function test_event_prices_are_returned_in_both_usd_and_preferred_display_currency(): void
+    {
+        // Set up exchange rate: 1 USD = 10,000 SYP (rate_to_base = 0.0001)
+        ExchangeRate::create([
+            'currency_code' => 'SYP',
+            'rate_to_base' => '0.0001000000',
+            'source' => ExchangeRateSource::Manual,
+            'effective_from' => now(),
+        ]);
+
+        $event = Event::create([
+            'title' => ['en' => 'AI Conference', 'ar' => 'مؤتمر الذكاء الاصطناعي'],
+            'start_at' => now()->addDays(5),
+            'end_at' => now()->addDays(5)->addHours(3),
+            'is_free' => false,
+            'price_points' => 100, // 100 pts = 10.00 USD at rate 0.10
+            'status' => 'published',
+        ]);
+
+        $member = User::factory()->create(['preferred_currency' => 'SYP']);
+        $member->assignRole('member');
+        Sanctum::actingAs($member, ['*']);
+
+        $response = $this->getJson('/api/v1/events');
+
+        $response->assertOk();
+        $item = collect($response->json('data'))->firstWhere('id', $event->id);
+        $this->assertNotNull($item);
+        // The member surface returns display labels only: the points as
+        // the member spends them, and the same price in their chosen
+        // currency. 100 pts =  .00 = 100,000 SYP at the seeded rate.
+        $this->assertSame(100, $item['pricing']['points']);
+        $this->assertSame(100000, $item['pricing']['price']);
+        // The symbol beside the amount, as the old label had it; no labels.
+        $this->assertSame('SYP', $item['pricing']['currency']);
+        $this->assertArrayNotHasKey('price_label', $item['pricing']);
+
+        // In Arabic, the currency is the localized symbol 'ل.س'
+        $responseAr = $this->withHeader('lang', 'ar')->getJson('/api/v1/events');
+        $responseAr->assertOk();
+        $itemAr = collect($responseAr->json('data'))->firstWhere('id', $event->id);
+        $this->assertSame(100000, $itemAr['pricing']['price']);
+        $this->assertSame('ل.س', $itemAr['pricing']['currency']);
+    }
+
+    public function test_admin_can_fetch_available_rooms_and_create_event_with_space_id(): void
+    {
+        $this->actingAsAdmin();
+
+        $branch = Branch::create([
+            'name' => ['en' => 'Aleppo Branch', 'ar' => 'فرع حلب'],
+            'city' => ['en' => 'Aleppo', 'ar' => 'حلب'],
+            'timezone' => 'Asia/Damascus',
+            'is_default' => true,
+        ]);
+
+        $building = Building::create([
+            'branch_id' => $branch->id,
+            'name' => ['en' => 'Main Building', 'ar' => 'المبنى الرئيسي'],
+            'floor_count' => 3,
+        ]);
+
+        $space = Space::factory()
+            ->eventHall()
+            ->create([
+                'building_id' => $building->id,
+                'capacity' => 100,
+            ]);
+
+        // 1. Fetch available rooms
+        $resRooms = $this->withHeaders(['lang' => 'ar'])->getJson('/api/v1/admin/events/rooms');
+        $resRooms->assertOk();
+        $this->assertCount(1, $resRooms->json('data'));
+        $this->assertSame($space->id, $resRooms->json('data.0.id'));
+        $this->assertSame('قاعة الفعاليات', $resRooms->json('data.0.name'));
+        $this->assertSame('فرع حلب', $resRooms->json('data.0.branch_name'));
+
+        // 2. Create event without typing location directly; location is automatically Branch + Room
+        $response = $this->withHeaders(['lang' => 'ar'])->postJson('/api/v1/admin/events', [
+            'title' => ['en' => 'Tech Gathering', 'ar' => 'ملتقى تقني'],
+            'space_id' => $space->id,
+            'start_at' => now()->addDays(2)->toDateTimeString(),
+            'end_at' => now()->addDays(2)->addHours(2)->toDateTimeString(),
+        ]);
+
+        $response->assertCreated();
+        $this->assertSame($space->id, $response->json('data.space_id'));
+        $this->assertSame('فرع حلب – قاعة الفعاليات', $response->json('data.location'));
+        $this->assertSame($branch->id, $response->json('data.branch_id'));
+        $this->assertSame(100, $response->json('data.capacity'));
+
+        // The label is derived on read from the live branch/space names,
+        // so nothing is frozen into the column for an on-site event.
+        $this->assertDatabaseHas('events', [
+            'id' => $response->json('data.id'),
+            'space_id' => $space->id,
+            'branch_id' => $branch->id,
+            'location' => null,
+            'capacity' => 100,
+        ]);
+
+        // 3. Create event with room name in English
+        $resEn = $this->withHeaders(['lang' => 'en'])->postJson('/api/v1/admin/events', [
+            'title' => ['en' => 'Workshop', 'ar' => 'ورشة'],
+            'branch_id' => $branch->id,
+            'room' => 'meeting_room',
+            'start_at' => now()->addDays(3)->toDateTimeString(),
+            'end_at' => now()->addDays(3)->addHours(2)->toDateTimeString(),
+        ]);
+
+        $resEn->assertCreated();
+        $this->assertSame('Aleppo Branch – Meeting Room', $resEn->json('data.location'));
+    }
+
+    public function test_named_rooms_are_distinguishable_and_location_follows_reader_locale(): void
+    {
+        $this->actingAsAdmin();
+
+        $branch = Branch::create([
+            'name' => ['en' => 'Aleppo Branch', 'ar' => 'فرع حلب'],
+            'city' => ['en' => 'Aleppo', 'ar' => 'حلب'],
+            'timezone' => 'Asia/Damascus',
+            'is_default' => true,
+        ]);
+
+        $building = Building::create([
+            'branch_id' => $branch->id,
+            'name' => ['en' => 'Main Building', 'ar' => 'المبنى الرئيسي'],
+            'floor_count' => 3,
+        ]);
+
+        // Two rooms of the same type in the same branch: under the old
+        // type-derived label both read "Meeting Room" and a member could
+        // not tell them apart.
+        $jasmine = Space::factory()->room()->create([
+            'building_id' => $building->id,
+            'name' => ['en' => 'Jasmine Room', 'ar' => 'غرفة الياسمين'],
+        ]);
+
+        $olive = Space::factory()->room()->create([
+            'building_id' => $building->id,
+            'name' => ['en' => 'Olive Room', 'ar' => 'غرفة الزيتون'],
+        ]);
+
+        $ids = [];
+        foreach ([$jasmine, $olive] as $space) {
+            $res = $this->withHeaders(['lang' => 'en'])->postJson('/api/v1/admin/events', [
+                'title' => ['en' => 'Session', 'ar' => 'جلسة'],
+                'space_id' => $space->id,
+                'start_at' => now()->addDays(2)->toDateTimeString(),
+                'end_at' => now()->addDays(2)->addHours(2)->toDateTimeString(),
+            ]);
+
+            $res->assertCreated();
+            $ids[] = $res->json('data.id');
+        }
+
+        $this->assertSame(
+            'Aleppo Branch – Jasmine Room',
+            $this->withHeaders(['lang' => 'en'])->getJson('/api/v1/admin/events/'.$ids[0])->json('data.location')
+        );
+
+        $this->assertSame(
+            'Aleppo Branch – Olive Room',
+            $this->withHeaders(['lang' => 'en'])->getJson('/api/v1/admin/events/'.$ids[1])->json('data.location')
+        );
+
+        // Same stored row, Arabic reader — the label is derived per request.
+        $this->assertSame(
+            'فرع حلب – غرفة الياسمين',
+            $this->withHeaders(['lang' => 'ar'])->getJson('/api/v1/admin/events/'.$ids[0])->json('data.location')
+        );
+
+        // Renaming the branch updates every event at once; nothing is frozen.
+        $branch->update(['name' => ['en' => 'Citadel Branch', 'ar' => 'فرع القلعة']]);
+
+        $this->assertSame(
+            'Citadel Branch – Jasmine Room',
+            $this->withHeaders(['lang' => 'en'])->getJson('/api/v1/admin/events/'.$ids[0])->json('data.location')
+        );
+    }
+
+    public function test_off_site_location_and_space_id_are_mutually_exclusive(): void
+    {
+        $this->actingAsAdmin();
+
+        $space = Space::factory()->room()->create();
+
+        $this->withHeaders(['lang' => 'en'])->postJson('/api/v1/admin/events', [
+            'title' => ['en' => 'Session', 'ar' => 'جلسة'],
+            'space_id' => $space->id,
+            'location' => 'Aleppo Citadel Gate',
+            'start_at' => now()->addDays(2)->toDateTimeString(),
+            'end_at' => now()->addDays(2)->addHours(2)->toDateTimeString(),
+        ])->assertStatus(422)->assertJsonValidationErrors('location');
+
+        // Off-site alone is still stored verbatim and returned as-is.
+        $res = $this->withHeaders(['lang' => 'en'])->postJson('/api/v1/admin/events', [
+            'title' => ['en' => 'Session', 'ar' => 'جلسة'],
+            'location' => 'Aleppo Citadel Gate',
+            'start_at' => now()->addDays(2)->toDateTimeString(),
+            'end_at' => now()->addDays(2)->addHours(2)->toDateTimeString(),
+        ]);
+
+        $res->assertCreated();
+        $this->assertSame('Aleppo Citadel Gate', $res->json('data.location'));
+        $this->assertDatabaseHas('events', [
+            'id' => $res->json('data.id'),
+            'location' => 'Aleppo Citadel Gate',
+        ]);
+    }
+
+    public function test_event_can_be_moved_from_on_site_to_off_site(): void
+    {
+        $this->actingAsAdmin();
+
+        $space = Space::factory()->room()->create([
+            'name' => ['en' => 'Jasmine Room', 'ar' => 'غرفة الياسمين'],
+        ]);
+
+        $created = $this->withHeaders(['lang' => 'en'])->postJson('/api/v1/admin/events', [
+            'title' => ['en' => 'Session', 'ar' => 'جلسة'],
+            'space_id' => $space->id,
+            'start_at' => now()->addDays(2)->toDateTimeString(),
+            'end_at' => now()->addDays(2)->addHours(2)->toDateTimeString(),
+        ])->assertCreated();
+
+        $id = $created->json('data.id');
+
+        $this->withHeaders(['lang' => 'en'])
+            ->patchJson('/api/v1/admin/events/'.$id, ['location' => 'Aleppo Citadel Gate'])
+            ->assertOk();
+
+        $this->assertDatabaseHas('events', [
+            'id' => $id,
+            'space_id' => null,
+            'location' => 'Aleppo Citadel Gate',
+        ]);
+
+        $this->assertSame(
+            'Aleppo Citadel Gate',
+            $this->withHeaders(['lang' => 'en'])->getJson('/api/v1/admin/events/'.$id)->json('data.location')
+        );
+    }
+
+    public function test_an_event_with_an_external_form_refuses_in_app_registration(): void
+    {
+        $this->seed(RoleSeeder::class);
+
+        $event = Event::factory()->create([
+            'external_form_url' => 'https://forms.example.com/signup',
+        ]);
+
+        $member = User::factory()->create();
+        $member->assignRole('member');
+        Sanctum::actingAs($member, ['*']);
+
+        $this->postJson("/api/v1/member/events/{$event->id}/register")
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('event');
+
+        // Nothing recorded: no seat taken, no approval pending.
+        $this->assertDatabaseCount('event_attendees', 0);
+    }
+
+    public function test_the_card_sends_members_to_the_external_form_instead_of_registering(): void
+    {
+        $event = Event::factory()->create([
+            'external_form_url' => 'https://forms.example.com/signup',
+        ]);
+
+        $card = collect($this->getJson('/api/v1/events')->json('data'))
+            ->firstWhere('id', $event->id);
+
+        // can_register says registration is open; the link says where.
+        // The POST stays refused (above) — the member registers there.
+        $this->assertSame('https://forms.example.com/signup', $card['external_form_url']);
+        $this->assertTrue($card['can_register']);
+    }
+
+    public function test_an_external_url_must_be_a_url(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/admin/events', [
+            'title' => ['en' => 'X', 'ar' => 'س'],
+            'start_at' => now()->addDays(2)->toDateTimeString(),
+            'end_at' => now()->addDays(2)->addHours(2)->toDateTimeString(),
+            'external_form_url' => 'not-a-url',
+        ])->assertStatus(422)->assertJsonValidationErrors('external_form_url');
+    }
+}

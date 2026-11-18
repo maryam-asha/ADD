@@ -1,0 +1,600 @@
+<?php
+
+namespace App\Http\Controllers\Api\V1\Member;
+
+use App\Concerns\LogsSensitiveActions;
+use App\Domain\Access\Enums\AccessRevokeReason;
+use App\Domain\Access\Services\PasscodeIssuanceService;
+use App\Domain\Booking\Enums\BookingStatus;
+use App\Domain\Booking\Events\CoworkingPaymentAtReception;
+use App\Domain\Booking\Exceptions\BatchUnavailableException;
+use App\Domain\Booking\Exceptions\ReceptionActionException;
+use App\Domain\Booking\Exceptions\WalletChoiceRequiredException;
+use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Services\AvailabilityService;
+use App\Domain\Booking\Services\BookingBatchCreationService;
+use App\Domain\Booking\Services\BookingCancellationService;
+use App\Domain\Booking\Services\BookingCreationService;
+use App\Domain\Booking\Services\BookingExtensionService;
+use App\Domain\Booking\Services\BookingPlanCoverage;
+use App\Domain\Booking\Services\BookingPresentationService;
+use App\Domain\Booking\Services\SessionClosureService;
+use App\Domain\Booking\ValueObjects\PoolDemand;
+use App\Domain\Finance\Enums\PaymentPurpose;
+use App\Domain\Finance\Payments\Methods\CashMethod;
+use App\Domain\Finance\Payments\Methods\WalletMethod;
+use App\Domain\Finance\Payments\PayableCheckout;
+use App\Domain\Finance\Payments\PaymentMethodRegistry;
+use App\Domain\Finance\Payments\PaymentStart;
+use App\Domain\Foundation\Models\Space;
+use App\Domain\Kitchen\Services\KitchenOrderSettlement;
+use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Pricing\Services\CouponEligibility;
+use App\Domain\Pricing\Services\CouponLedger;
+use App\Domain\Pricing\Services\PriceQuoteService;
+use App\Http\Controllers\Concerns\AnswersPayments;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Member\Booking\ExtendBookingRequest;
+use App\Http\Requests\Member\Booking\ListBookingsRequest;
+use App\Http\Requests\Member\Booking\PayBookingRequest;
+use App\Http\Requests\Member\Booking\PreviewBookingRequest;
+use App\Http\Requests\Member\Booking\StoreBookingBatchRequest;
+use App\Http\Requests\Member\Booking\StoreBookingRequest;
+use App\Http\Resources\BookingResource;
+use App\Http\Resources\Finance\PaymentResource;
+use App\Http\Resources\MemberBookingDetailResource;
+use App\Http\Resources\MemberBookingResource;
+use App\Services\Realtime\RealtimeBroadcaster;
+use App\Support\Presenters\CouponOutcomePresenter;
+use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Throwable;
+
+class BookingController extends Controller
+{
+    use AnswersPayments;
+    use LogsSensitiveActions;
+
+    /**
+     * The member's own bookings, filtered on their `status` — one or several,
+     * none for all — as a page and its `meta`
+     * (docs/decisions/booking-outcomes-and-extension.md).
+     *
+     * Newest booking first (by `id`), whatever is asked for. No per-tab
+     * `counts`: the screen shows none, and each cost a query.
+     */
+    public function index(ListBookingsRequest $request): JsonResponse
+    {
+        $statuses = $request->statuses();
+        $perPage = (int) ($request->validated('per_page') ?? 15);
+
+        $paginator = Booking::query()
+            ->where('user_id', $request->user()->id)
+            ->when($statuses !== [], fn ($query) => $query->whereIn('status', $statuses))
+            ->orderByDesc('id')
+            // The card reads its space and nothing else; without this, that
+            // is a query per card.
+            ->with('space')
+            ->paginate($perPage);
+
+        return response()->json([
+            'data' => MemberBookingResource::collection($paginator->items())->resolve(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                // What was filtered on; empty for every booking.
+                'status' => array_map(fn (BookingStatus $status) => $status->value, $statuses),
+            ],
+        ]);
+    }
+
+    /**
+     * Every booking status with its label in the requested language — what
+     * the app draws badges from and offers as `status` filters
+     * (docs/decisions/booking-outcomes-and-extension.md).
+     */
+    public function statuses(): JsonResponse
+    {
+        $locale = app()->getLocale();
+
+        return response()->json([
+            'data' => [
+                'statuses' => array_map(fn (BookingStatus $status) => [
+                    'key' => $status->value,
+                    'label' => $status->label($locale),
+                ], BookingStatus::cases()),
+            ],
+        ]);
+    }
+
+    public function show(Request $request, Booking $booking): JsonResponse
+    {
+        $this->assertOwned($booking, $request);
+
+        $booking->loadMissing(['space.building.branch', 'space.zone.floor', 'seatSpace.building', 'seatSpace.zone.floor']);
+
+        return response()->json([
+            'data' => new MemberBookingDetailResource($booking),
+        ]);
+    }
+
+    /**
+     * Cancellation is the same service reception calls; the only member-
+     * specific part is proving the booking is theirs, which matches the
+     * existing extend() precedent rather than introducing a Policy.
+     */
+    public function cancel(Request $request, Booking $booking, BookingCancellationService $cancellations): JsonResponse
+    {
+        $this->assertOwned($booking, $request);
+
+        try {
+            $cancellations->cancel($booking);
+        } catch (ReceptionActionException $e) {
+            return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
+        }
+
+        $this->logSensitiveAction('booking_cancelled', $booking);
+
+        return response()->json(['message' => __('api.booking.cancelled')]);
+    }
+
+    /**
+     * The confirmation screen, without creating anything.
+     *
+     * Availability is reported rather than enforced here: this is a
+     * read, and the slot can still be taken between previewing and
+     * confirming, which is why store() re-checks under a row lock.
+     */
+    public function preview(
+        PreviewBookingRequest $request,
+        AvailabilityService $availability,
+        BookingPresentationService $presentation,
+        PriceQuoteService $quotes,
+        CouponEligibility $coupons,
+        BookingPlanCoverage $planCoverage,
+    ): JsonResponse {
+        $space = Space::with(['building.branch', 'zone.floor'])->findOrFail($request->validated('space_id'));
+        $locale = app()->getLocale();
+
+        $start = Carbon::parse($request->validated('start_at'), 'UTC');
+        $end = Carbon::parse($request->validated('end_at'), 'UTC');
+
+        $rules = $availability->rulesFor($space);
+        $existing = $availability->blockingBookings($space, $start, $end, $rules);
+        // What the member's plan covers, exactly as the POST works it out.
+        $coverage = $planCoverage->for($request->user(), $space, $start, $end);
+
+        $unavailableKey = match (true) {
+            ! $availability->acceptsBookings($space) => 'api.booking.space_not_bookable',
+            ! $availability->isFarEnoughAhead($start, $rules) => 'api.booking.too_soon',
+            ! $availability->isWithinAdvanceHorizon($start, $rules) => 'api.booking.too_far_ahead',
+            ! $availability->isWithinBusinessHours($space, $start, $end, $rules) => 'api.reception.outside_business_hours',
+            ! $availability->isValidGranularity($start, $rules) => 'api.booking.invalid_start_time',
+            ! $availability->isLongEnough($start, $end, $rules) => 'api.booking.duration_too_short',
+            ! $availability->matchesDurationGranularity($start, $end, $rules) => 'api.booking.duration_invalid_granularity',
+            $availability->isHeldByLease(
+                $availability->blockingLeases($space->id, $start, $end, $rules->timezone),
+                $start,
+                $end,
+                $rules->timezone,
+            ) => 'api.booking.office_leased',
+            $availability->isFullyCoveredBySeat($coverage, $start, $end) => 'api.booking.covered_by_plan',
+            // A co_space's seat comes from its branch's pool, counted on the
+            // member's subscription as the POST counts it; a room may be lent
+            // to co-working (docs/decisions/coworking-seat-pool.md).
+            $rules->usesBranchPool && $availability->exceedsPool(
+                $availability->poolTimeline($space, $start, $end, PoolDemand::presence($start, $end, $request->user())),
+                $start,
+                $end,
+            ) => 'api.booking.slot_unavailable',
+            ! $rules->usesBranchPool && $availability->exceedsCeiling($existing, $start, $end, $rules) => 'api.booking.slot_unavailable',
+            ! $rules->usesBranchPool && $availability->isInCoworkingMode(
+                $availability->blockingCoworkingWindows($space, $start, $end),
+                $start,
+                $end,
+            ) => 'api.booking.room_in_coworking_mode',
+            $availability->violatesBuffer($existing, $start, $end, $rules) => 'api.booking.buffer_conflict',
+            default => null,
+        };
+
+        // Priced exactly as POST bookings will price it — a coupon included —
+        // so the preview and the charge cannot disagree.
+        $code = $request->validated('coupon_code');
+
+        try {
+            $coupon = $code !== null ? $coupons->resolve($code) : null;
+            $quote = $quotes->forBooking($space, $start, $end, $request->user(), $coupon, coveredSeconds: $coverage->coveredSeconds);
+        } catch (ReceptionActionException $e) {
+            return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
+        }
+
+        $breakdown = $presentation->breakdownOf($quote, $space, $start, $end, $locale);
+
+        return response()->json([
+            'data' => [
+                ...($code !== null ? ['coupon' => app(CouponOutcomePresenter::class)->fromQuote($code, $quote, $locale)] : []),
+                'space' => [
+                    'id' => $space->id,
+                    'title' => $space->displayTitle($locale),
+                    'space_type' => $space->space_type->value,
+                    'capacity' => $space->capacity,
+                    'main_image' => $space->main_image,
+                ],
+                'when' => $presentation->when($start, $end),
+                'breakdown' => $breakdown,
+                'payment_methods' => $presentation->paymentMethods(
+                    $request->user(),
+                    $breakdown['total']['points'],
+                    $locale,
+                ),
+                'requires_approval' => $rules->requiresApproval,
+                'approval_notice' => $rules->requiresApproval
+                    ? __('api.space.requires_approval_notice', [], $locale)
+                    : null,
+                'note_field' => [
+                    'key' => 'note',
+                    'label' => __('api.booking.note_label', [], $locale),
+                    'placeholder' => __('api.booking.note_placeholder', [], $locale),
+                    'max_length' => 500,
+                    'required' => false,
+                ],
+                'is_available' => $unavailableKey === null,
+                'unavailable_reason' => $unavailableKey === null ? null : __($unavailableKey, [], $locale),
+            ],
+        ]);
+    }
+
+    public function store(
+        StoreBookingRequest $request,
+        BookingCreationService $creations,
+        PayableCheckout $checkout,
+        PaymentMethodRegistry $methods,
+    ): JsonResponse {
+        if ($request->validated('booking_id') !== null) {
+            return $this->payExisting($request, $checkout);
+        }
+
+        $space = Space::findOrFail($request->validated('space_id'));
+
+        $walletOwnerType = $request->validated('wallet_owner_type')
+            ? OwnerType::from($request->validated('wallet_owner_type'))
+            : null;
+
+        try {
+            $booking = $creations->create(
+                $space,
+                $request->user(),
+                Carbon::parse($request->validated('start_at'), 'UTC'),
+                Carbon::parse($request->validated('end_at'), 'UTC'),
+                $walletOwnerType,
+                $request->validated('wallet_owner_id'),
+                $request->validated('note'),
+                $request->validated('payment_method'),
+                $request->validated('coupon_code'),
+            );
+        } catch (ReceptionActionException $e) {
+            return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
+        } catch (WalletChoiceRequiredException $e) {
+            return response()->json([
+                'message' => __('api.booking.wallet_choice_required'),
+                'wallet_options' => $e->options,
+            ], 422);
+        }
+
+        $this->logSensitiveAction('booking_created', $booking);
+
+        $method = $request->validated('payment_method');
+        $card = $method !== null && in_array($method, $methods->gatewayKeys(), true)
+            ? $this->payBesideNewRecord($checkout, PaymentPurpose::Booking, $booking, $request->user(), $method)
+            : [];
+
+        $code = $request->validated('coupon_code');
+        $coupon = $code !== null
+            ? ['coupon' => app(CouponOutcomePresenter::class)->present($code, app(CouponLedger::class)->couponFor($booking))]
+            : [];
+
+        return response()->json(['data' => (new BookingResource($booking))->resolve($request) + $card] + $coupon, 201);
+    }
+
+    /**
+     * The confirm screen sent again with the booking it made: nothing is
+     * created and no creation rule runs — the booking exists and holds its
+     * slot, and its price was fixed when it was made. Only how it is paid
+     * changes, through the same checkout every operation uses.
+     */
+    private function payExisting(StoreBookingRequest $request, PayableCheckout $checkout): JsonResponse
+    {
+        $member = $request->user();
+        $booking = Booking::query()->where('user_id', $member->id)->findOrFail($request->validated('booking_id'));
+
+        if (! $this->sentValuesMatch($booking, $request)) {
+            return response()->json(['message' => __('api.booking.booking_mismatch')], 422);
+        }
+
+        try {
+            $outcome = $checkout->pay(PaymentPurpose::Booking, $booking, $member, $request->validated('payment_method'), [
+                'wallet_owner_type' => $request->validated('wallet_owner_type'),
+                'wallet_owner_id' => $request->validated('wallet_owner_id'),
+            ], $request->validated('coupon_code'));
+        } catch (Throwable $e) {
+            return $this->paymentFailureResponse($e, $member->id) ?? throw $e;
+        }
+
+        return response()->json(
+            ['data' => (new BookingResource($booking->refresh()))->resolve($request) + $this->checkoutFields($outcome)]
+                + ($outcome->coupon !== null ? ['coupon' => $outcome->coupon] : [])
+        );
+    }
+
+    /**
+     * The confirm screen may send its values unchanged; any it sends must
+     * be this booking's — a stale id in the app is refused, never paid.
+     */
+    private function sentValuesMatch(Booking $booking, StoreBookingRequest $request): bool
+    {
+        $space = $request->validated('space_id');
+        $start = $request->validated('start_at');
+        $end = $request->validated('end_at');
+
+        return ($space === null || (int) $space === (int) $booking->space_id)
+            && ($start === null || Carbon::parse($start, 'UTC')->equalTo($booking->start_at))
+            && ($end === null || Carbon::parse($end, 'UTC')->equalTo($booking->end_at));
+    }
+
+    /**
+     * Several dates, one request, all or nothing.
+     *
+     * A failure names each window that could not be taken by its index in
+     * the submitted list, so the app can mark the offending chips rather
+     * than saying "something went wrong".
+     */
+    public function storeBatch(StoreBookingBatchRequest $request, BookingBatchCreationService $batches): JsonResponse
+    {
+        $walletOwnerType = $request->validated('wallet_owner_type')
+            ? OwnerType::from($request->validated('wallet_owner_type'))
+            : null;
+
+        try {
+            $bookings = $batches->createMany(
+                $request->validated('windows'),
+                $request->user(),
+                $walletOwnerType,
+                $request->validated('wallet_owner_id'),
+                $request->validated('note'),
+                $request->validated('payment_method'),
+                $request->validated('coupon_code'),
+            );
+        } catch (BatchUnavailableException $e) {
+            return response()->json([
+                'message' => __('api.booking.batch_partially_unavailable'),
+                'errors' => array_map(fn (array $failure) => [
+                    'index' => $failure['index'],
+                    'start_at' => $failure['start_at'],
+                    'reason' => $failure['reason'],
+                    'message' => __($failure['message_key']),
+                ], $e->failures),
+            ], 422);
+        } catch (ReceptionActionException $e) {
+            return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
+        } catch (WalletChoiceRequiredException $e) {
+            return response()->json([
+                'message' => __('api.booking.wallet_choice_required'),
+                'wallet_options' => $e->options,
+            ], 422);
+        }
+
+        foreach ($bookings as $booking) {
+            $this->logSensitiveAction('booking_created', $booking);
+        }
+
+        return response()->json([
+            'message' => __('api.booking.batch_created', ['count' => count($bookings)]),
+            'data' => BookingResource::collection($bookings)->resolve(),
+        ], 201);
+    }
+
+    /**
+     * How far the member's running booking can be extended and at what price
+     * — or why it cannot be (docs/decisions/booking-outcomes-and-extension.md).
+     * A read: extend() re-checks the same rules under its locks.
+     */
+    public function extensionOptions(Request $request, Booking $booking, BookingPresentationService $presentation): JsonResponse
+    {
+        $this->assertOwned($booking, $request);
+
+        $booking->loadMissing('space.building.branch');
+
+        return response()->json([
+            'data' => $presentation->extensionOptions($booking, app()->getLocale(), $request->user()),
+        ]);
+    }
+
+    /**
+     * The added time is paid by the method the member chooses here
+     * (`payment_method`, required when it costs anything): `wallet` spends
+     * the points with the extension — short, nothing is extended — and a
+     * card answers with its `redirect_url`, the extension standing whatever
+     * the bank says, and `cash` leaves it owed, collected at the desk when
+     * the booking closes. `data` carries `payment`, `redirect_url` and `next`
+     * (`done` | `redirect` | `pay_at_reception`), and `payment_error` when
+     * the card page could not be opened — the extension is then owed.
+     */
+    public function extend(ExtendBookingRequest $request, Booking $booking, BookingExtensionService $extensions): JsonResponse
+    {
+        $this->assertOwned($booking, $request);
+
+        $member = $request->user();
+
+        try {
+            $outcome = $extensions->extend(
+                $booking,
+                $request->validated('additional_minutes'),
+                $request->validated('payment_method'),
+                [
+                    'wallet_owner_type' => $request->validated('wallet_owner_type'),
+                    'wallet_owner_id' => $request->validated('wallet_owner_id'),
+                ],
+                methodRequired: true,
+            );
+        } catch (Throwable $e) {
+            return $this->paymentFailureResponse($e, $member->id) ?? throw $e;
+        }
+
+        $this->logSensitiveAction('booking_extended', $booking, [
+            'additional_minutes' => $request->validated('additional_minutes'),
+            'payment_method' => $outcome->differencePoints > 0 ? $request->validated('payment_method') : null,
+        ]);
+
+        // Cash leaves the extension owed: the desk collects it at check-out.
+        $atReception = $outcome->differencePoints > 0 && $request->validated('payment_method') === CashMethod::KEY;
+
+        $payment = [
+            'payment' => $outcome->walletPayment === null ? null : new PaymentResource($outcome->walletPayment),
+            'redirect_url' => null,
+            'next' => $atReception ? PaymentStart::PAY_AT_RECEPTION : PaymentStart::DONE,
+        ];
+
+        if ($outcome->gateway !== null) {
+            try {
+                ['payment' => $opened, 'start' => $start] = $extensions->openCardPayment($booking, $outcome);
+                $payment = ['payment' => new PaymentResource($opened), 'redirect_url' => $start->redirectUrl, 'next' => $start->kind];
+            } catch (Throwable $e) {
+                $failure = $e instanceof ReceptionActionException
+                    ? ['key' => $e->messageKey]
+                    : ($this->gatewayFailure($e, $member->id) ?? throw $e);
+
+                $payment = ['payment' => null, 'redirect_url' => null, 'next' => PaymentStart::DONE, 'payment_error' => __($failure['key'])];
+            }
+        }
+
+        // The room the member sat in goes back to being a room: they are
+        // told where to move, the one time it matters.
+        return response()->json([
+            'message' => $outcome->movedTo === null
+                ? __('api.booking.extended')
+                : __('api.booking.extended_seat_moved', ['place' => app(BookingPresentationService::class)->seat($outcome->movedTo, app()->getLocale())['formatted']]),
+            'data' => $payment,
+        ]);
+    }
+
+    /**
+     * The member checking out of a checked-in room, office or hall booking
+     * (its home card's button): it closes now at its full booked price, no
+     * refund for leaving early (SessionClosureService::checkOutByMember()),
+     * and its door code stops working. A coworking booking is refused — it
+     * ends through coworking-sessions/current/end-request. What it still
+     * owes is then paid through POST bookings/{booking}/pay.
+     */
+    public function checkOut(Request $request, Booking $booking, SessionClosureService $closures, PasscodeIssuanceService $passcodes): JsonResponse
+    {
+        $this->assertOwned($booking, $request);
+
+        try {
+            $closures->checkOutByMember($booking);
+        } catch (ReceptionActionException $e) {
+            return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
+        }
+
+        // The booking is closed whatever the lock says: a vendor failure is
+        // logged, never the member's error.
+        try {
+            $passcodes->revokeForBooking($booking, AccessRevokeReason::CheckedOut);
+        } catch (Throwable $e) {
+            Log::error('Failed to revoke the door code of a booking the member checked out of', [
+                'booking_id' => $booking->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        $this->logSensitiveAction('booking_checked_out_by_member', $booking, ['amount_owed' => (string) $booking->amount_owed]);
+
+        return response()->json(['message' => __('api.booking.checked_out')]);
+    }
+
+    /**
+     * What a closed booking still owes — an extension, an overstay, or all
+     * of it when it was booked to be paid at the desk — paid from the app,
+     * its home card's button: by the method it was booked with
+     * (`chosen_payment_method`) unless the member names another. `wallet`
+     * spends the points now, a gateway answers with its `redirect_url`, and
+     * `cash` answers `next: pay_at_reception` and tells the desk to collect
+     * it. A booking still to close is paid through POST bookings instead.
+     * Not the member's: 404, as for a coworking session's payment.
+     *
+     * Its unpaid kitchen orders, each its own payable (kitchen orders spec,
+     * decision 11), are paid with it from the member's own general points
+     * when it is paid from the wallet: the orders first, or — should they
+     * take points the booking needs — the booking first and the orders as far as
+     * what is left goes; one the wallet cannot cover stays owed. Paid by
+     * card (Paymera) or cash, the orders are not paid here in this version:
+     * they stay outstanding, on the desk's list, and are paid by paying
+     * again with `wallet` (once the booking is paid, that pays only its orders:
+     * payOwedOrdersOnly(), which takes no other method) or at the desk —
+     * settle-payment settles the booking with its orders (only its orders, once
+     * the booking itself is paid), payments/settle one order at a time.
+     * Which wallet pays the booking is decided before the orders spend
+     * anything (KitchenOrderSettlement::payFromWalletWithBill()).
+     */
+    public function pay(PayBookingRequest $request, Booking $booking, PayableCheckout $checkout, RealtimeBroadcaster $realtime, KitchenOrderSettlement $orders): JsonResponse
+    {
+        $member = $request->user();
+
+        abort_if($booking->user_id !== $member->id, 404);
+
+        if ($booking->checked_out_at === null) {
+            return response()->json(['message' => __('api.reception.not_yet_checked_out')], 422);
+        }
+
+        $method = $request->validated('payment_method') ?? $booking->chosen_payment_method;
+
+        if ($method === null) {
+            return response()->json(['message' => __('api.booking.payment_method_required')], 422);
+        }
+
+        $walletOwner = [
+            'wallet_owner_type' => $request->validated('wallet_owner_type'),
+            'wallet_owner_id' => $request->validated('wallet_owner_id'),
+        ];
+        $pay = fn (array $walletOwner) => $checkout->pay(PaymentPurpose::Booking, $booking, $member, $method, $walletOwner, $request->validated('coupon_code'));
+
+        try {
+            if (($ordersOnly = $this->payOwedOrdersOnly($booking, $method, $orders)) !== null) {
+                return $ordersOnly;
+            }
+
+            $outcome = $method === WalletMethod::KEY
+                ? $orders->payFromWalletWithBill($booking, PaymentPurpose::Booking, $walletOwner, $pay)
+                : $pay($walletOwner);
+        } catch (Throwable $e) {
+            return $this->paymentFailureResponse($e, $member->id) ?? throw $e;
+        }
+
+        if ($outcome->start->kind === PaymentStart::PAY_AT_RECEPTION) {
+            $realtime->send(new CoworkingPaymentAtReception($booking));
+        }
+
+        return response()->json([
+            'data' => $this->checkoutFields($outcome) + ($outcome->coupon !== null ? ['coupon' => $outcome->coupon] : []),
+        ], 201);
+    }
+
+    /**
+     * A member may only ever act on their own booking.
+     *
+     * 403, matching the contract extend() has already shipped
+     * (BookingControllerTest::test_a_member_cannot_extend_another_members_booking).
+     * A 404 would leak less about the id space, but changing a live
+     * response code for that is a separate decision, not a side effect of
+     * adding read endpoints.
+     */
+    private function assertOwned(Booking $booking, Request $request): void
+    {
+        if ($booking->user_id !== $request->user()->id) {
+            abort(403, __('api.booking.not_your_booking'));
+        }
+    }
+}

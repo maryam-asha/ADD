@@ -1,0 +1,143 @@
+<?php
+
+namespace App\Http\Controllers\Api\V1\Auth;
+
+use App\Domain\Identity\Enums\OtpPurpose;
+use App\Domain\Identity\Models\User;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Auth\ForgotPasswordRequest;
+use App\Http\Requests\Auth\ResetPasswordRequest;
+use App\Http\Requests\Auth\VerifyPasswordResetRequest;
+use App\Services\Auth\TokenPairService;
+use App\Services\Otp\Exceptions\OtpDeliveryFailedException;
+use App\Services\Otp\Exceptions\OtpThrottledException;
+use App\Services\Otp\OtpResult;
+use App\Services\Otp\OtpService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * Recovery for members who signed up with a phone and a password. Separate
+ * from Fortify's email-based reset, which serves the operations dashboard —
+ * members have no email requirement, so the WhatsApp code is the only channel
+ * that reliably reaches them.
+ */
+class MemberPasswordController extends Controller
+{
+    public function __construct(
+        private readonly OtpService $otp,
+        private readonly TokenPairService $tokens,
+    ) {}
+
+    public function forgot(ForgotPasswordRequest $request): JsonResponse
+    {
+        $phone = $request->validated('phone');
+
+        if (! $this->memberFor($phone)) {
+            return response()->json([
+                'message' => __('api.auth.phone_not_found'),
+            ], 422);
+        }
+
+        try {
+            $this->otp->request($phone, OtpPurpose::PasswordReset);
+        } catch (OtpThrottledException $e) {
+            return response()->json([
+                'message' => __('api.auth.otp_request_throttled'),
+                'retry_after' => $e->retryAfterSeconds,
+            ], 429);
+        } catch (OtpDeliveryFailedException) {
+            return response()->json(['message' => __('api.auth.otp_send_failed')], 503);
+        }
+
+        return response()->json([
+            'message' => __('api.auth.password_reset_code_sent'),
+        ]);
+    }
+
+    /**
+     * Spends the code and authorizes the reset step server-side. The code
+     * itself can't do double duty as that proof: verify() marks it verified_at
+     * on success, which drops it out of the "outstanding" query verify() itself
+     * reads, so it cannot be checked again by reset().
+     */
+    public function verify(VerifyPasswordResetRequest $request): JsonResponse
+    {
+        $phone = $request->validated('phone');
+
+        $user = $this->memberFor($phone);
+
+        // Checked before the code is spent, and answered as an invalid code so
+        // the endpoint stays as silent as forgot() about who has an account
+        // here. forgot() never mints a code for a non-member, so this should be
+        // unreachable — it is the backstop, not the gate.
+        if (! $user) {
+            return response()->json(['message' => __('api.auth.code_invalid')], 422);
+        }
+
+        $result = $this->otp->verify($phone, $request->validated('code'), OtpPurpose::PasswordReset);
+
+        if ($result === OtpResult::PurposeMismatch) {
+            return response()->json([
+                'message' => __('api.auth.code_purpose_mismatch_registration'),
+            ], 422);
+        }
+
+        if ($result !== OtpResult::Verified) {
+            return response()->json(['message' => __('api.auth.code_invalid')], 422);
+        }
+
+        $this->otp->authorizeReset($phone, OtpPurpose::PasswordReset);
+
+        return response()->json(['message' => __('api.auth.otp_verified')]);
+    }
+
+    /**
+     * Sets the new password and ends every session the account has open. The
+     * revocation is the point, not housekeeping: whoever prompted the reset may
+     * already hold the old password, and a session opened with it would
+     * otherwise outlive the credential it was granted under.
+     */
+    public function reset(ResetPasswordRequest $request): JsonResponse
+    {
+        $phone = $request->validated('phone');
+
+        $user = $this->memberFor($phone);
+
+        // Checked before the authorization is spent, and answered as an
+        // invalid code so the endpoint stays as silent as forgot() about who
+        // has an account here. forgot() never mints a code for a non-member,
+        // so this should be unreachable — it is the backstop, not the gate.
+        if (! $user) {
+            return response()->json(['message' => __('api.auth.reset_authorization_invalid')], 422);
+        }
+
+        if (! $this->otp->consumeResetAuthorization($phone, OtpPurpose::PasswordReset)) {
+            return response()->json(['message' => __('api.auth.reset_authorization_invalid')], 422);
+        }
+
+        DB::transaction(function () use ($user, $request) {
+            $user->forceFill(['password' => $request->validated('password')])->save();
+
+            $this->tokens->revokeAll($user);
+        });
+
+        return response()->json([
+            'message' => __('api.auth.password_updated'),
+        ]);
+    }
+
+    /**
+     * The account this surface is allowed to act on, or null.
+     *
+     * Scoped to the `member` role for the same reason login is: `password` is a
+     * single column shared with the Fortify dashboard, so a reset driven from
+     * here would rewrite an operator's dashboard credential — reachable by
+     * whoever controls that operator's phone, and bypassing the email-based
+     * reset the dashboard actually uses.
+     */
+    private function memberFor(string $phone): ?User
+    {
+        return User::where('phone', $phone)->role('member')->first();
+    }
+}

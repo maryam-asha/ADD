@@ -1,0 +1,410 @@
+<?php
+
+namespace App\Domain\Booking\Services;
+
+use App\Domain\Booking\Enums\BookingStatus;
+use App\Domain\Booking\Enums\PaymentSource;
+use App\Domain\Booking\Enums\PaymentState;
+use App\Domain\Booking\Exceptions\ReceptionActionException;
+use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Booking\ValueObjects\BookingCoverage;
+use App\Domain\Booking\ValueObjects\PoolDemand;
+use App\Domain\Booking\ValueObjects\SpaceBookingRules;
+use App\Domain\Finance\Payments\PaymentMethodRegistry;
+use App\Domain\Finance\Payments\PrepaymentHold;
+use App\Domain\Finance\Services\PointConversionService;
+use App\Domain\Foundation\Models\Branch;
+use App\Domain\Foundation\Models\Space;
+use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Pricing\Enums\PricingPurpose;
+use App\Domain\Pricing\Services\CouponEligibility;
+use App\Domain\Pricing\Services\CouponLedger;
+use App\Domain\Pricing\Services\PriceQuoteService;
+use App\Domain\Pricing\Services\QuoteRecorder;
+use App\Domain\Settings\Services\SettingService;
+use Carbon\CarbonInterface;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * Member-facing booking creation — the piece Reception Operations
+ * deliberately deferred. Validation order matches the phase brief exactly:
+ * business hours, then granularity, then duration (none of these depend on
+ * shared state, so none need a lock); then, inside one locked transaction
+ * on the Space row, overlap + live occupancy, then buffer; then payment;
+ * then the requires_approval branch. Task 4 adds payment routing and Task 5
+ * adds the requires_approval branch to this same create() method.
+ */
+class BookingCreationService
+{
+    public function __construct(
+        private readonly AvailabilityService $availability,
+        private readonly PointConversionService $points,
+        private readonly SettingService $settings,
+        private readonly BookingPaymentRouter $payments,
+        private readonly PriceQuoteService $quotes,
+        private readonly QuoteRecorder $recorder,
+        private readonly CouponEligibility $coupons,
+        private readonly CouponLedger $couponLedger,
+        private readonly PendingBookingNotice $pendingNotice,
+        private readonly ConfirmedBookingNotice $confirmedNotice,
+        private readonly PaymentMethodRegistry $methods,
+        private readonly PrepaymentHold $holds,
+        private readonly BookingCancellationService $cancellations,
+        private readonly BookingPlanCoverage $coverage,
+    ) {}
+
+    public function create(
+        Space $space,
+        User $member,
+        CarbonInterface $startAt,
+        CarbonInterface $endAt,
+        ?OwnerType $walletOwnerType = null,
+        ?int $walletOwnerId = null,
+        ?string $note = null,
+        ?string $paymentMethod = null,
+        ?string $couponCode = null,
+        bool $byReception = false,
+    ): Booking {
+        // Normalize to UTC: Eloquent's datetime cast stores the Carbon
+        // value's current wall-clock as-is and reinterprets it as UTC on
+        // read, so a non-UTC input (e.g. a Damascus-timezone request time)
+        // would round-trip with a 3-hour drift — the same fix
+        // SessionClosureService::finalizeClosure() applies to
+        // checked_out_at for the identical reason.
+        $startAt = $startAt->copy()->setTimezone('UTC');
+        $endAt = $endAt->copy()->setTimezone('UTC');
+
+        $rules = $this->availability->rulesFor($space);
+
+        $this->assertInTheFuture($startAt);
+        $this->assertWithinBookingWindow($startAt, $rules);
+        $this->assertWithinBusinessHours($space, $startAt, $endAt, $rules);
+        $this->assertValidGranularity($startAt, $rules);
+        $this->assertValidDuration($startAt, $endAt, $rules);
+
+        // An unknown code is refused before anything is locked.
+        $coupon = $couponCode !== null ? $this->coupons->resolve($couponCode) : null;
+
+        return DB::transaction(function () use ($space, $member, $startAt, $endAt, $walletOwnerType, $walletOwnerId, $rules, $note, $paymentMethod, $coupon, $byReception) {
+            // The coupon's and the limited offers' rows first — before the branch and the space — so
+            // its limits are counted from a fresh snapshot (CouponLedger).
+            $coupon = $this->couponLedger->lockForPricing($coupon);
+
+            if ($rules->usesBranchPool) {
+                // Every decision about a branch's co-working seats — bookings,
+                // walk-ins, subscriptions — is serialized on the branch row,
+                // taken before the space's (docs/decisions/coworking-seat-pool.md).
+                Branch::query()->whereKey($space->building->branch_id)->lockForUpdate()->first();
+            }
+
+            $locked = Space::query()->whereKey($space->id)->lockForUpdate()->firstOrFail();
+
+            // Read off the locked row, so a space put into maintenance while
+            // this request was in flight is refused rather than booked.
+            $this->assertAcceptsBookings($locked);
+            $this->assertNotLeased($locked, $startAt, $endAt, $rules);
+
+            // A member who went back from the confirm screen and picked
+            // another time would be refused by their own hold: holds of
+            // theirs on this space that this window would collide with are
+            // let go first. Only a hold — a real booking still blocks.
+            $padding = max($rules->bufferMinutes, 0);
+            Booking::query()
+                ->forSpace($locked->id)
+                ->where('user_id', $member->id)
+                ->where('status', BookingStatus::AwaitingPayment)
+                ->overlapping($startAt->copy()->subMinutes($padding), $endAt->copy()->addMinutes($padding))
+                ->get()
+                ->each(fn (Booking $hold) => $this->cancellations->releaseUnpaidHold($hold));
+
+            // Re-read inside the lock. Nothing the calendar computed is
+            // reused here — the read path is advisory, and only these
+            // freshly-read rows decide whether the slot is actually free.
+            $existing = $this->availability->blockingBookings($locked, $startAt, $endAt, $rules);
+
+            if ($rules->usesBranchPool) {
+                $this->assertPoolHasRoom($locked, $member, $startAt, $endAt);
+            } else {
+                $this->assertSlotAvailable($existing, $startAt, $endAt, $rules);
+                $this->assertNotLentToCoworking($locked, $startAt, $endAt);
+                $this->assertOccupancyLeavesRoom($locked, $startAt, $endAt);
+            }
+
+            $this->assertBufferRespected($existing, $startAt, $endAt, $rules);
+
+            // The member's plan: a coworking seat that already holds them
+            // this whole stretch refuses it; any hours it covers are not
+            // charged (product owner, 2026-11-02).
+            $coverage = $this->coverage->for($member, $locked, $startAt, $endAt);
+            $this->assertNotCoveredBySeat($coverage, $startAt, $endAt);
+
+            // The list price, the better of the best automatic offer and the
+            // member's plan discount (applied automatically, never an opt-in
+            // — docs/decisions/plan-discounts-design.md), and the coupon on
+            // top: PriceQuoteService, the one place a price is composed.
+            $quote = $this->quotes->forBooking($locked, $startAt, $endAt, $member, $coupon, coveredSeconds: $coverage->coveredSeconds);
+            $finalPoints = $quote->finalPoints;
+
+            // Decided before the booking is made, so a refusal (a wallet
+            // choice, a strict wallet payment that falls short) makes none.
+            $payingWallet = $this->payments->choose($member, $finalPoints, $paymentMethod, $walletOwnerType, $walletOwnerId);
+
+            // `amount_owed`/`currency` are the booking's money-denominated
+            // record of the charge and remain decimal USD — only the wallet
+            // ledger became point-denominated. Converting the point charge
+            // back here is the intended direction, not leftover scaffolding.
+            $amount = $this->points->pointsToUsd($finalPoints);
+
+            // A prepaid method pays after the booking exists: it is held
+            // until the card goes through, the member chooses another
+            // method, or its deadline (docs/decisions/prepayment-all-or-nothing.md).
+            $held = $finalPoints > 0
+                && $paymentMethod !== null
+                && in_array($paymentMethod, $this->methods->gatewayKeys(), true);
+
+            $status = match (true) {
+                $held => BookingStatus::AwaitingPayment,
+                (bool) $locked->requires_approval => BookingStatus::Pending,
+                default => BookingStatus::Confirmed,
+            };
+
+            $booking = Booking::create([
+                'space_id' => $locked->id,
+                'seat_space_id' => $rules->usesBranchPool ? $this->availability->seatFor($locked, $startAt, $endAt, $member)?->id : null,
+                'user_id' => $member->id,
+                'start_at' => $startAt,
+                'end_at' => $endAt,
+                'status' => $status,
+                'required_approval' => (bool) $locked->requires_approval,
+                'payment_due_at' => $held ? $this->holds->dueAt($startAt) : null,
+                'amount_owed' => $amount,
+                'currency' => 'USD',
+                ...$quote->attributes(),
+                'payment_state' => PaymentState::Unpaid,
+                'chosen_payment_method' => $paymentMethod,
+                'note' => $note,
+                // Wholly covered by plan hours: nothing to pay, and it holds
+                // its seat like a paid booking (never released unpaid).
+                ...($finalPoints === 0 && $coverage->coveredSeconds > 0
+                    ? ['payment_state' => PaymentState::Paid, 'payment_source' => PaymentSource::Plan, 'paid_at' => now()]
+                    : []),
+            ]);
+
+            $this->coverage->record($coverage, $booking, $member);
+
+            if ($payingWallet !== null) {
+                $this->payments->pay($booking, $member, $payingWallet);
+            }
+
+            // A plan discount or a coupon is used up by the booking it
+            // priced, paid now or later (cash, card, pay-now, the desk):
+            // `price_points` is the reduced price whenever it is paid, so the
+            // limits count it either way. Cancelling or rejecting gives it back.
+            $this->recorder->record($quote, $booking, $member, PricingPurpose::Booking);
+
+            if ($status === BookingStatus::Pending) {
+                $this->pendingNotice->send($booking);
+            }
+
+            // A held booking is told when its card goes through (PrepaymentHold).
+            if ($status === BookingStatus::Confirmed) {
+                $this->confirmedNotice->send($booking, $byReception);
+            }
+
+            return $booking;
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // Every rule below is decided by AvailabilityService — the one copy in
+    // this codebase. These methods exist only to turn a `false` into the
+    // message key and status this endpoint has always returned, in the
+    // order it has always checked them. Putting the rule itself back here
+    // would make the calendar and this method drift apart silently, which
+    // is what tests/Guards/AvailabilityRulesAreCentralizedTest prevents.
+    // ------------------------------------------------------------------
+
+    /**
+     * A booking cannot start in the past.
+     *
+     * Closes a real trap rather than a theoretical one: a past-dated
+     * booking could be created and paid for, and BookingCancellationService
+     * then refuses to cancel it because its cancellation window has long
+     * gone — so it could never be undone.
+     *
+     * A booking starting this very minute is fine; only a start strictly
+     * before now is refused. The `booking.allow_past_bookings` setting
+     * exists so reception can later be given a back-dating override
+     * without this method changing.
+     */
+    private function assertInTheFuture(CarbonInterface $start): void
+    {
+        if ((bool) $this->settings->get('booking.allow_past_bookings', false)) {
+            return;
+        }
+
+        if ($start->lessThan(now())) {
+            throw new ReceptionActionException('api.booking.start_in_the_past');
+        }
+    }
+
+    /**
+     * The booking window: at least `min_notice_minutes` of notice, and no
+     * further out than `max_days_ahead`. Both default to off.
+     */
+    private function assertWithinBookingWindow(CarbonInterface $start, SpaceBookingRules $rules): void
+    {
+        if (! $this->availability->isFarEnoughAhead($start, $rules)) {
+            throw new ReceptionActionException('api.booking.too_soon');
+        }
+
+        if (! $this->availability->isWithinAdvanceHorizon($start, $rules)) {
+            throw new ReceptionActionException('api.booking.too_far_ahead');
+        }
+    }
+
+    private function assertNotCoveredBySeat(BookingCoverage $coverage, CarbonInterface $start, CarbonInterface $end): void
+    {
+        if ($this->availability->isFullyCoveredBySeat($coverage, $start, $end)) {
+            throw new ReceptionActionException('api.booking.covered_by_plan');
+        }
+    }
+
+    private function assertAcceptsBookings(Space $space): void
+    {
+        if (! $this->availability->acceptsBookings($space)) {
+            throw new ReceptionActionException('api.booking.space_not_bookable');
+        }
+    }
+
+    /** An office a company leases on that day takes no booking (docs/decisions/office-leases.md). */
+    private function assertNotLeased(Space $space, CarbonInterface $start, CarbonInterface $end, SpaceBookingRules $rules): void
+    {
+        $leases = $this->availability->blockingLeases($space->id, $start, $end, $rules->timezone);
+
+        if ($this->availability->isHeldByLease($leases, $start, $end, $rules->timezone)) {
+            throw new ReceptionActionException('api.booking.office_leased');
+        }
+    }
+
+    private function assertWithinBusinessHours(Space $space, CarbonInterface $start, CarbonInterface $end, SpaceBookingRules $rules): void
+    {
+        if (! $this->availability->isWithinBusinessHours($space, $start, $end, $rules)) {
+            throw new ReceptionActionException('api.reception.outside_business_hours');
+        }
+    }
+
+    private function assertValidGranularity(CarbonInterface $start, SpaceBookingRules $rules): void
+    {
+        if (! $this->availability->isValidGranularity($start, $rules)) {
+            throw new ReceptionActionException('api.booking.invalid_start_time');
+        }
+    }
+
+    private function assertValidDuration(CarbonInterface $start, CarbonInterface $end, SpaceBookingRules $rules): void
+    {
+        if (! $this->availability->isLongEnough($start, $end, $rules)) {
+            throw new ReceptionActionException('api.booking.duration_too_short');
+        }
+
+        if (! $this->availability->matchesDurationGranularity($start, $end, $rules)) {
+            throw new ReceptionActionException('api.booking.duration_invalid_granularity');
+        }
+    }
+
+    /**
+     * @param  Collection<int, Booking>  $existing
+     */
+    private function assertSlotAvailable(Collection $existing, CarbonInterface $start, CarbonInterface $end, SpaceBookingRules $rules): void
+    {
+        if ($this->availability->exceedsCeiling($existing, $start, $end, $rules)) {
+            throw new ReceptionActionException('api.booking.slot_unavailable');
+        }
+    }
+
+    /**
+     * A co_space booking needs a seat in its branch's co-working pool at
+     * every moment of the window, counted with everything already there —
+     * subscriptions, bookings, and the walk-ins inside now — and with this
+     * booking on its member's subscription when they hold one
+     * (docs/decisions/coworking-seat-pool.md).
+     */
+    private function assertPoolHasRoom(Space $space, User $member, CarbonInterface $start, CarbonInterface $end): void
+    {
+        $timeline = $this->availability->poolTimeline($space, $start, $end, PoolDemand::presence($start, $end, $member));
+
+        if ($this->availability->exceedsPool($timeline, $start, $end)) {
+            throw new ReceptionActionException('api.booking.slot_unavailable');
+        }
+    }
+
+    /** A room lent to co-working takes no room booking while it is lent. */
+    private function assertNotLentToCoworking(Space $space, CarbonInterface $start, CarbonInterface $end): void
+    {
+        $windows = $this->availability->blockingCoworkingWindows($space, $start, $end);
+
+        if ($this->availability->isInCoworkingMode($windows, $start, $end)) {
+            throw new ReceptionActionException('api.booking.room_in_coworking_mode');
+        }
+    }
+
+    /**
+     * Present-moment physical-presence count, reusing
+     * WalkInCapacityService::start()'s exact counting logic. A room's only:
+     * a co_space's walk-ins are in its branch's pool.
+     *
+     * Narrowed to windows that actually contain now(). It answers "is there
+     * room in this space at this moment", which is the right question for
+     * someone arriving now and the wrong one for next Tuesday: a booking
+     * for tomorrow afternoon used to be refused because the room happened
+     * to be full as the request was made, and no amount of waiting would
+     * fix it. That also made a forward-looking calendar impossible to get
+     * right, since the read path cannot know the present occupancy of a
+     * future slot. Future windows are governed by the overlap-versus-
+     * ceiling check above instead, which is the reservation-based model
+     * space_capacity_slots now records.
+     *
+     * A deliberate loosening, documented in
+     * docs/decisions/booking-availability-and-calendar.md.
+     */
+    private function assertOccupancyLeavesRoom(Space $space, CarbonInterface $start, CarbonInterface $end): void
+    {
+        if ($space->capacity === null) {
+            return;
+        }
+
+        $now = now();
+
+        if ($start->greaterThan($now) || $end->lessThanOrEqualTo($now)) {
+            return;
+        }
+
+        $occupied = Booking::query()
+            ->where('space_id', $space->id)
+            ->whereNotNull('checked_in_at')
+            ->whereNull('checked_out_at')
+            ->count();
+
+        $occupied += WalkinSession::query()
+            ->where('space_id', $space->id)
+            ->whereNull('checked_out_at')
+            ->count();
+
+        if ($occupied >= $space->capacity) {
+            throw new ReceptionActionException('api.reception.no_capacity');
+        }
+    }
+
+    /**
+     * @param  Collection<int, Booking>  $existing
+     */
+    private function assertBufferRespected(Collection $existing, CarbonInterface $start, CarbonInterface $end, SpaceBookingRules $rules): void
+    {
+        if ($this->availability->violatesBuffer($existing, $start, $end, $rules)) {
+            throw new ReceptionActionException('api.booking.buffer_conflict');
+        }
+    }
+}

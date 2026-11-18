@@ -1,0 +1,53 @@
+<?php
+
+namespace Add\Inventory\Catalog\Http\Requests;
+
+use Add\Inventory\Catalog\Enums\ItemKind;
+use Add\Inventory\Catalog\Enums\SkuMode;
+use Add\Inventory\Catalog\Models\Category;
+use Add\Inventory\Support\TranslatableField;
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+class StoreItemRequest extends FormRequest
+{
+    use ValidatesBarcodeAndUnits;
+    use ValidatesProperties;
+
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return ['sku.prohibited' => __('inventory::catalog.sku_numbered')];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function rules(): array
+    {
+        $category = is_numeric($this->input('category_id')) ? Category::query()->find($this->input('category_id')) : null;
+
+        return [
+            ...TranslatableField::rules('name'),
+            'category_id' => ['required', 'integer', Rule::exists('inv_categories', 'id')],
+            // Stock is counted in a unit; an asset item one by one, so it may have none.
+            'unit_id' => [Rule::requiredIf($category?->kind !== ItemKind::Asset), 'nullable', 'integer', Rule::exists('inv_units', 'id')],
+            // Numbered from the id when left out; refused when the package
+            // numbers every item (SkuMode::Auto).
+            'sku' => SkuMode::current()->typedOnCreate()
+                ? ['nullable', 'string', 'max:40', Rule::unique('inv_items', 'sku')]
+                : ['prohibited'],
+            'description' => ['nullable', 'string', 'max:5000'],
+            'is_active' => ['sometimes', 'boolean'],
+            ...$this->propertyRules($category),
+            ...$this->barcodeAndUnitRules(null, $this->input('unit_id')),
+        ];
+    }
+}

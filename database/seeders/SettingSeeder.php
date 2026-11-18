@@ -1,0 +1,75 @@
+<?php
+
+namespace Database\Seeders;
+
+use App\Domain\Booking\Enums\LateArrivalBilling;
+use App\Domain\Booking\Services\CoworkingBookingPolicy;
+use App\Domain\Membership\Services\TopUpMinimum;
+use App\Domain\Settings\Enums\SettingValueType;
+use App\Domain\Settings\Services\SettingService;
+use Illuminate\Database\Seeder;
+
+/**
+ * Default values for every global setting key introduced by the 2026-08-15
+ * decision session (docs/decisions/settings-key-value-store.md). Seeded
+ * ahead of the domains that read them (business hours, booking, guests,
+ * profile completion, module toggles) — settings is the explicit enabler,
+ * built first per that session's execution order.
+ */
+class SettingSeeder extends Seeder
+{
+    public function run(SettingService $settings): void
+    {
+        $settings->setDefault('booking.cancellation_window_minutes', 60, SettingValueType::Int);
+        $settings->setDefault('booking.slot_granularity_minutes', 30, SettingValueType::Int);
+        $settings->setDefault('booking.min_duration_minutes', 60, SettingValueType::Int);
+        $settings->setDefault('booking.overrun_grace_minutes', 10, SettingValueType::Int);
+        $settings->setDefault('booking.buffer_minutes', 0, SettingValueType::Int);
+        // A closed session's time is billed in whole blocks of this many
+        // minutes, rounded up (SessionClosureService::priceFor()).
+        $settings->setDefault('coworking.billing_increment_minutes', 15, SettingValueType::Int);
+        // An unpaid coworking booking is released once this share of its
+        // length passes without its member; an unpaid one's late arrival
+        // is billed from the arrival or the booking start
+        // (CoworkingBookingPolicy).
+        $settings->setDefault(CoworkingBookingPolicy::RELEASE_PERCENT_KEY, CoworkingBookingPolicy::DEFAULT_RELEASE_PERCENT, SettingValueType::Int);
+        $settings->setDefault(CoworkingBookingPolicy::LATE_BILLING_KEY, LateArrivalBilling::Arrival->value, SettingValueType::String);
+        // Shown on the confirmation screen's price breakdown. Zero is a
+        // decision, not a hardcoded literal — the arithmetic path handles a
+        // non-zero rate even though it currently always evaluates to zero.
+        $settings->setDefault('booking.vat_percent', 0, SettingValueType::Int);
+        // A past-dated booking could be created and paid for, and could
+        // then never be cancelled, since its cancellation window had
+        // already gone. Off by default; the flag exists so reception can be
+        // given a back-dating override later without a code change.
+        $settings->setDefault('booking.allow_past_bookings', false, SettingValueType::Bool);
+        // The booking window; a booking's length has no ceiling. The notice
+        // starts at an hour: a member books at least 60 minutes before the
+        // start (0 turns it off). How many days ahead is unlimited (0) until
+        // an admin sets a value.
+        $settings->setDefault('booking.min_notice_minutes', 60, SettingValueType::Int);
+        $settings->setDefault('booking.max_days_ahead', 0, SettingValueType::Int);
+        $settings->setDefault('profile.completion_threshold', 80, SettingValueType::Int);
+        $settings->setDefault('guest.host_approval_timeout_seconds', 120, SettingValueType::Int);
+        // A coworking guest's free minutes before their visit bills from the
+        // arrival, how many such graces a phone gets a day, and how many
+        // guests one host may have inside at once (GuestVisitService).
+        $settings->setDefault('guest.grace_minutes', 15, SettingValueType::Int);
+        $settings->setDefault('guest.free_visits_per_day', 1, SettingValueType::Int);
+        $settings->setDefault('guest.max_active_per_host', 3, SettingValueType::Int);
+        $settings->setDefault('kiosk.arrival_request_expiry_minutes', 30, SettingValueType::Int);
+        $settings->setDefault('kiosk.app_store_url', 'https://apps.example.local/ios', SettingValueType::String);
+        $settings->setDefault('kiosk.google_play_url', 'https://apps.example.local/android', SettingValueType::String);
+        $settings->setDefault('module.cafe.is_enabled', true, SettingValueType::Bool);
+        $settings->setDefault('app.timezone', 'Asia/Damascus', SettingValueType::String);
+        $settings->setDefault('point.rate_usd', '0.10', SettingValueType::String);
+        $settings->setDefault(TopUpMinimum::SETTING_KEY, TopUpMinimum::DEFAULT_POINTS, SettingValueType::Int);
+        // Provider invoicing: days from issue to due when the provider has
+        // no payment terms of its own (docs/superpowers/specs/2026-10-10-provider-invoicing-design.md).
+        $settings->setDefault('invoices.default_due_days', 15, SettingValueType::Int);
+
+        // Auto-renewal: how many days before a subscription or lease ends
+        // its renewal is made (docs/superpowers/specs/2026-10-11-auto-renewal-design.md).
+        $settings->setDefault('renewals.advance_days', 7, SettingValueType::Int);
+    }
+}

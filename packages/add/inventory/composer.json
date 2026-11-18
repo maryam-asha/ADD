@@ -1,0 +1,39 @@
+{
+    "name": "add/inventory",
+    "description": "Inventory for Laravel: a catalog of items in nested categories with their own fields, fixed assets tracked one by one (location, custody, maintenance, depreciation, disposal) and consumable stock kept per location (receipts, issues, transfers, counts at weighted average cost), exposed as a JSON API the host mounts.",
+    "type": "library",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.3",
+        "ext-bcmath": "*",
+        "illuminate/console": "^12.0",
+        "illuminate/contracts": "^12.0",
+        "illuminate/database": "^12.0",
+        "illuminate/http": "^12.0",
+        "illuminate/routing": "^12.0",
+        "illuminate/support": "^12.0",
+        "illuminate/validation": "^12.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^10.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Add\\Inventory\\": "src/",
+            "Add\\Inventory\\Database\\Factories\\": "database/factories/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Add\\Inventory\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Add\\Inventory\\InventoryServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "stable"
+}

@@ -1,0 +1,46 @@
+{
+    "name": "Update User Status",
+    "request": {
+        "method": "PATCH",
+        "header": [
+            {
+                "key": "Content-Type",
+                "value": "application/json"
+            },
+            {
+                "key": "lang",
+                "value": "{{lang}}",
+                "type": "text"
+            },
+            {
+                "key": "currency",
+                "value": "{{currency}}",
+                "type": "text"
+            }
+        ],
+        "body": {
+            "mode": "raw",
+            "raw": "{\n  \"status\": \"deactivated\",\n  \"reason\": \"left the company\"\n}",
+            "options": {
+                "raw": {
+                    "language": "json"
+                }
+            }
+        },
+        "url": {
+            "raw": "{{base_url}}/api/v1/admin/users/{{user_id}}/status",
+            "host": [
+                "{{base_url}}"
+            ],
+            "path": [
+                "api",
+                "v1",
+                "admin",
+                "users",
+                "{{user_id}}",
+                "status"
+            ]
+        },
+        "description": "status must be active, deactivated, or blocked (422 otherwise). Setting deactivated/blocked immediately revokes every access token this user holds (User::deactivate()/block()) \u2014 their very next request with an old token comes back 401, not 403. reason is optional but always recorded (status_reason/status_changed_at/status_changed_by). Returns `{\"message\": \"...\"}` on success, not the updated user resource."
+    }
+}

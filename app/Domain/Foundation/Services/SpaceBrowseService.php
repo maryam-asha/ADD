@@ -1,0 +1,531 @@
+<?php
+
+namespace App\Domain\Foundation\Services;
+
+use App\Domain\Finance\Services\PointConversionService;
+use App\Domain\Foundation\Enums\OperationalStatus;
+use App\Domain\Foundation\Enums\SpaceType;
+use App\Domain\Foundation\Models\Amenity;
+use App\Domain\Foundation\Models\Branch;
+use App\Domain\Foundation\Models\Space;
+use App\Domain\Identity\Models\User;
+use App\Domain\Inventory\SpaceEquipment;
+use App\Domain\Membership\Models\Membership;
+use App\Domain\Membership\Services\MembershipResolver;
+use App\Domain\Membership\Services\PlanDiscountService;
+use App\Domain\Pricing\Services\OfferResolver;
+use App\Domain\Settings\Services\SettingService;
+use App\Support\Presenters\BranchHoursPresenter;
+use App\Support\Presenters\PriceLabelPresenter;
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
+
+class SpaceBrowseService
+{
+    public function __construct(
+        private readonly BusinessHoursService $businessHours,
+        private readonly SettingService $settings,
+        private readonly PointConversionService $points,
+        private readonly BranchHoursPresenter $hours,
+        private readonly PriceLabelPresenter $prices,
+        private readonly OfferResolver $offers,
+        private readonly SpaceEquipment $equipment,
+        private readonly MembershipResolver $memberships,
+        private readonly PlanDiscountService $planDiscounts,
+    ) {}
+
+    /** @var array<int, Membership|null> member id => their live membership, read once per listing */
+    private array $membershipOf = [];
+
+    /**
+     * Note: there is no `date` filter here. One was documented for a long
+     * time and never read. "Spaces with any availability on this date" is a
+     * real feature but a different one — it means an availability
+     * computation per card per page — and it belongs after the calendar
+     * exists and can be measured. Dates live in
+     * Member\SpaceAvailabilityController.
+     *
+     * @param array{
+     *     space_type?: ?string,
+     *     min_capacity?: ?int,
+     *     branch_id?: ?int,
+     *     amenity?: ?string,
+     *     per_page?: ?int,
+     *     page?: ?int,
+     * } $filters
+     * @return array<string, mixed>
+     */
+    public function browse(array $filters, ?User $user = null): array
+    {
+        $timezone = $this->settings->get('app.timezone', 'Asia/Damascus');
+
+        // 1. Resolve Target Branch
+        $branch = $this->resolveBranch($filters['branch_id'] ?? null, $user);
+        if (! $branch) {
+            return [
+                'working_hours_banner' => null,
+                'spaces' => [],
+                'meta' => [
+                    'current_page' => 1,
+                    'from' => null,
+                    'last_page' => 1,
+                    'per_page' => 10,
+                    'to' => null,
+                    'total' => 0,
+                    'total_results' => 0,
+                    'space_type' => 'all',
+                    'branch_id' => null,
+                ],
+            ];
+        }
+
+        // 2. Working Hours Banner for Branch: today's hours, plus the branch's
+        // week and closures. They are the same for every space, so they are
+        // stated here, once, rather than in each space's details.
+        $today = Carbon::now($timezone)->startOfDay();
+        $periods = $this->businessHours->periodsFor($today, $branch);
+        $banner = [
+            ...$this->buildWorkingHoursBanner($periods, $today, $timezone),
+            ...$this->branchWeek($branch, $periods, $timezone),
+        ];
+
+        // 3. Query Active Spaces for Branch — a private office held by a
+        // lease today is not on offer (docs/superpowers/specs/2026-10-10-office-leases-design.md).
+        $spacesQuery = Space::query()
+            ->active()
+            ->whereDoesntHave('officeLeases', fn ($q) => $q->holdingOn(now()->toDateString()))
+            ->with(['amenities.definition', 'building', 'zone.floor'])
+            ->whereHas('building', fn ($q) => $q->where('branch_id', $branch->id));
+
+        $requestedType = strtolower((string) ($filters['space_type'] ?? 'all'));
+        $resolvedType = $this->mapSpaceType($requestedType);
+
+        if ($resolvedType !== null) {
+            $spacesQuery->where('space_type', $resolvedType->value);
+        }
+
+        if (! empty($filters['min_capacity'])) {
+            $spacesQuery->where('capacity', '>=', (int) $filters['min_capacity']);
+        }
+
+        // An amenity by its key or name, or equipment members see by its
+        // name.
+        if (! empty($filters['amenity'])) {
+            $amenityNeedle = strtolower($filters['amenity']);
+            $spacesQuery->where(function ($q) use ($amenityNeedle) {
+                $q->whereHas('amenities', function ($toggle) use ($amenityNeedle) {
+                    $toggle->where('amenity', $amenityNeedle)
+                        ->orWhereHas('definition', fn ($amenity) => $amenity->where('is_active', true)->where('name', 'LIKE', "%{$amenityNeedle}%"));
+                })->orWhereIn('id', $this->equipment->spacesMatching($amenityNeedle));
+            });
+        }
+
+        // 4. Paginate spaces (default: 10 per page)
+        $perPage = max(1, min(100, (int) ($filters['per_page'] ?? 10)));
+        $paginator = $spacesQuery->orderBy('hourly_rate_points', 'asc')->paginate($perPage);
+
+        // 5. Transform Space Cards
+        $this->equipment->load(collect($paginator->items())->pluck('id'));
+        $items = collect($paginator->items())->map(fn (Space $space) => $this->formatSpaceCard($space, $user));
+
+        return [
+            'working_hours_banner' => $banner,
+            'spaces' => $items->all(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'from' => $paginator->firstItem(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'to' => $paginator->lastItem(),
+                'total' => $paginator->total(),
+                'total_results' => $paginator->total(),
+                'space_type' => $requestedType ?: 'all',
+                'branch_id' => $branch->id,
+            ],
+        ];
+    }
+
+    private function resolveBranch(?int $branchId, ?User $user): ?Branch
+    {
+        if ($branchId) {
+            return Branch::query()->where('is_active', true)->find($branchId);
+        }
+
+        if ($user) {
+            $homeBranch = $user->branches()->wherePivot('is_home_branch', true)->first();
+            if ($homeBranch && $homeBranch->is_active) {
+                return $homeBranch;
+            }
+        }
+
+        return Branch::query()->where('is_active', true)->first();
+    }
+
+    private function mapSpaceType(string $type): ?SpaceType
+    {
+        return match ($type) {
+            'co_space', 'hot_desk', 'open_space' => SpaceType::CoSpace,
+            'room', 'meeting_room' => SpaceType::Room,
+            'business', 'private_office' => SpaceType::Business,
+            'event_hall' => SpaceType::EventHall,
+            default => null,
+        };
+    }
+
+    /**
+     * @param  array<int, array{open_time: string, close_time: string}>  $periods
+     * @return array<string, mixed>|null
+     */
+    private function buildWorkingHoursBanner(array $periods, CarbonInterface $targetDate, string $timezone): ?array
+    {
+        if (empty($periods)) {
+            return [
+                'text' => __('api.space.working_hours_notice'),
+                'hours' => null,
+                'open_time' => null,
+                'close_time' => null,
+                'is_open' => false,
+            ];
+        }
+
+        $firstOpen = $periods[0]['open_time'];
+        $lastClose = end($periods)['close_time'];
+
+        $openCarbon = Carbon::parse($firstOpen, $timezone);
+        $closeCarbon = Carbon::parse($lastClose, $timezone);
+
+        $formattedHours = sprintf('%s – %s', $openCarbon->format('g:i A'), $closeCarbon->format('g:i A'));
+
+        return [
+            'text' => __('api.space.working_hours_notice'),
+            'hours' => $formattedHours,
+            'open_time' => $firstOpen,
+            'close_time' => $lastClose,
+            'is_open' => true,
+        ];
+    }
+
+    /**
+     * The branch's hours beyond today, for the list's banner — everything the
+     * member app needs about the branch before any booking screen opens:
+     *
+     * - `periods`: today's, the periods behind `hours`.
+     * - `schedule` / `open_weekdays` / `days_label`: the ordinary week, its
+     *   days grouped by the hours they share (a branch keeps different hours
+     *   on different days).
+     * - the timezone, and its label derived per request (Damascus has DST).
+     *
+     * The upcoming closures are not here: the booking calendar is set up
+     * from the space details, which carry them as plain dates.
+     *
+     * Written by the same BranchHoursPresenter as the calendars' hours card.
+     *
+     * @param  array<int, array{open_time: string, close_time: string}>  $periods  today's
+     * @return array<string, mixed>
+     */
+    private function branchWeek(Branch $branch, array $periods, string $timezone): array
+    {
+        $locale = app()->getLocale();
+        $timezoneLabel = $this->hours->timezoneLabel($timezone);
+
+        return [
+            'title' => __('api.booking.branch_hours_title', [
+                'branch' => $branch->translate('name', $locale) ?? 'Aleppo Digital District',
+            ], $locale),
+            'periods' => $periods,
+            ...$this->hours->week($this->businessHours->weeklySchedule($branch), $timezone, $locale),
+            'timezone' => $timezone,
+            'timezone_label' => $timezoneLabel,
+            'timezone_note' => __('api.booking.timezone_note', ['offset' => $timezoneLabel], $locale),
+        ];
+    }
+
+    /**
+     * @return array<int, array{key: string, label: string, icon: string}>
+     */
+    public function categories(): array
+    {
+        return [
+            ['key' => 'all', 'label' => 'All', 'icon' => 'grid'],
+            ['key' => 'co_space', 'label' => 'Hot Desk', 'icon' => 'desk'],
+            ['key' => 'business', 'label' => 'Private Office', 'icon' => 'door'],
+            ['key' => 'room', 'label' => 'Meeting Room', 'icon' => 'meeting'],
+            ['key' => 'event_hall', 'label' => 'Event Hall', 'icon' => 'stage'],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function formatSpaceCard(Space $space, ?User $user): array
+    {
+        $badge = match ($space->space_type) {
+            SpaceType::CoSpace => 'OPEN SPACE',
+            SpaceType::Room => 'MEETING ROOM',
+            SpaceType::Business => 'PRIVATE OFFICE',
+            SpaceType::EventHall => 'EVENT HALL',
+        };
+
+        $title = $space->displayTitle();
+
+        $subtitle = match ($space->space_type) {
+            SpaceType::CoSpace => 'Open Workspace',
+            default => __('api.space.up_to_people', ['count' => $space->capacity ?? 1]),
+        };
+
+        $amenities = $this->buildAmenities($space);
+
+        return [
+            'id' => $space->id,
+            'title' => $title,
+            'subtitle' => $subtitle,
+            'badge' => $badge,
+            'status' => $space->status->value,
+            'status_label' => __('api.space.statuses.'.$space->status->value),
+            'space_type' => $space->space_type->value,
+            'capacity' => $space->capacity,
+            'capacity_label' => $space->space_type === SpaceType::CoSpace
+                ? __('api.space.single_seat')
+                : __('api.space.up_to_people', ['count' => $space->capacity ?? 1]),
+            'pricing' => $this->prices->hourly((int) ($space->hourly_rate_points ?? 0), $user),
+            // The best offer live now for this member: the rate struck
+            // through, the offer rate, when it ends.
+            'sale' => $this->sale($space, $user),
+            'amenities' => $amenities,
+            'main_image' => $space->main_image,
+        ];
+    }
+
+    /**
+     * The `sale` block of a space's hourly rate: the reduction a booking
+     * made now would get (PriceQuoteService::forBooking) — the best
+     * automatic offer or the member's plan discount on this space, the
+     * lower price of the two, a tie to the offer. A plan discount whose
+     * uses are spent is not shown; it ends with the plan, so no end date.
+     */
+    private function sale(Space $space, ?User $user): ?array
+    {
+        $rate = (int) ($space->hourly_rate_points ?? 0);
+        $offer = $this->offers->hourlyNow($space, $user);
+        $membership = null;
+
+        if ($user !== null && $rate > 0) {
+            if (! array_key_exists($user->id, $this->membershipOf)) {
+                $this->membershipOf[$user->id] = $this->memberships->activeFor($user);
+            }
+
+            $membership = $this->membershipOf[$user->id];
+        }
+
+        $discount = $membership !== null ? $this->planDiscounts->resolveFor($membership, $space, [], $user) : null;
+        $planRate = $discount !== null ? $this->planDiscounts->apply($rate, $discount) : $rate;
+
+        return $planRate < $rate && ($offer === null || $planRate < $offer->points)
+            ? $this->prices->saleAt($planRate, null, $rate, $user, 'hour', 'api.space')
+            : $this->prices->sale($offer, $rate, $user, 'hour', 'api.space');
+    }
+
+    /**
+     * @return array<int, array{key: string, label: string, icon: string}>
+     */
+    private function buildAmenities(Space $space): array
+    {
+        $amenities = [];
+
+        if ($space->space_type === SpaceType::CoSpace) {
+            $amenities[] = ['key' => 'seat', 'label' => __('api.space.single_seat'), 'icon' => 'user'];
+        }
+
+        // Two genuinely different sources merge here: the amenities toggled
+        // on for this space (SpaceAmenity) and the equipment in it members
+        // see (inventory assets — projectors, mics, ...).
+        foreach ($this->activeAmenities($space) as $amenity) {
+            $amenities[] = $this->resolveAmenity($amenity);
+        }
+
+        foreach ($this->equipment->for($space) as $equipment) {
+            $amenities[] = $equipment;
+        }
+
+        // Add lockable if not already present
+        if ($space->is_lockable && ! collect($amenities)->contains('key', 'lockable')) {
+            $amenities[] = ['key' => 'lockable', 'label' => 'Lockable', 'icon' => 'lock'];
+        }
+
+        return array_values($amenities);
+    }
+
+    /**
+     * The catalog amenities turned on for this space, minus any the admin
+     * has since switched off in the catalog itself.
+     *
+     * @return list<Amenity>
+     */
+    private function activeAmenities(Space $space): array
+    {
+        return $space->amenities
+            ->map(fn ($toggle) => $toggle->definition)
+            ->filter(fn (?Amenity $amenity) => $amenity?->is_active)
+            ->sortBy('order')
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array{key: string, label: string, icon: string}
+     */
+    private function resolveAmenity(Amenity $amenity): array
+    {
+        return [
+            'key' => $amenity->key,
+            'label' => (string) $amenity->translate('name'),
+            'icon' => $amenity->icon ?? 'check-circle',
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function details(Space $space, ?User $user = null): array
+    {
+        if ($space->status !== OperationalStatus::Active) {
+            abort(404);
+        }
+
+        $space->loadMissing(['amenities.definition', 'building.branch', 'zone.floor']);
+
+        $timezone = $this->settings->get('app.timezone', 'Asia/Damascus');
+        $branch = $space->building->branch;
+        $periods = $this->businessHours->periodsFor(Carbon::now($timezone), $branch);
+        $hoursBanner = $this->buildWorkingHoursBanner($periods, Carbon::now($timezone), $timezone);
+
+        $badge = match ($space->space_type) {
+            SpaceType::CoSpace => 'OPEN SPACE',
+            SpaceType::Room => 'MEETING ROOM',
+            SpaceType::Business => 'PRIVATE OFFICE',
+            SpaceType::EventHall => 'EVENT HALL',
+        };
+
+        $title = $space->displayTitle();
+
+        $subtitle = match ($space->space_type) {
+            SpaceType::CoSpace => 'Open Workspace',
+            default => __('api.space.up_to_people', ['count' => $space->capacity ?? 1]),
+        };
+
+        $descriptionKey = 'api.space.descriptions.'.$space->space_type->value;
+        $description = __($descriptionKey);
+
+        $quickFeatures = $this->buildQuickFeatures($space);
+
+        $branchName = $branch->translate('name') ?? 'Aleppo Digital District';
+        $floorLabel = $space->zone?->floor?->label ?? 'Ground Floor';
+        $formattedLocation = sprintf('%s - %s', $branchName, $floorLabel);
+
+        $formattedWorkingHours = $hoursBanner['hours'] ?? '8:00 AM – 10:00 PM';
+
+        $amenitiesChecklist = $this->buildAmenitiesChecklist($space);
+
+        return [
+            'id' => $space->id,
+            'badge' => $badge,
+            'title' => $title,
+            'subtitle' => $subtitle,
+            'description' => $description,
+            'images' => $space->images,
+            'quick_features' => $quickFeatures,
+            'details' => [
+                'status' => $space->status->value,
+                'status_label' => __('api.space.statuses.'.$space->status->value),
+                'pricing' => $this->prices->hourly((int) ($space->hourly_rate_points ?? 0), $user),
+                'sale' => $this->sale($space, $user),
+                'capacity' => [
+                    'count' => $space->capacity ?? 1,
+                    'formatted' => ($space->capacity ?? 1) === 1
+                        ? __('api.space.person', ['count' => 1])
+                        : __('api.space.people', ['count' => $space->capacity]),
+                ],
+                'location' => [
+                    'branch' => $branchName,
+                    'building' => $space->building->translate('name'),
+                    'floor' => $floorLabel,
+                    'zone' => $space->zone?->label,
+                    'formatted' => $formattedLocation,
+                ],
+                'working_hours' => [
+                    'formatted' => $formattedWorkingHours,
+                    'open_time' => $hoursBanner['open_time'] ?? null,
+                    'close_time' => $hoursBanner['close_time'] ?? null,
+                    'is_open' => $hoursBanner['is_open'] ?? true,
+                ],
+            ],
+            'amenities' => $amenitiesChecklist,
+            'cta' => [
+                'space_id' => $space->id,
+                'button_text' => __('api.space.book_this_space'),
+                'can_book' => true,
+            ],
+        ];
+    }
+
+    /**
+     * @return array<int, array{key: string, label: string, icon: string}>
+     */
+    private function buildQuickFeatures(Space $space): array
+    {
+        $features = [];
+
+        $capacity = $space->capacity ?? 1;
+        $seatLabel = $capacity === 1
+            ? __('api.space.seat', ['count' => 1])
+            : __('api.space.seats', ['count' => $capacity]);
+
+        $features[] = ['key' => 'seat', 'label' => $seatLabel, 'icon' => 'user'];
+        $features[] = ['key' => 'wifi', 'label' => 'Wi-Fi', 'icon' => 'wifi'];
+        $features[] = ['key' => 'power', 'label' => 'Power', 'icon' => 'zap'];
+
+        $areaLabel = match ($space->space_type) {
+            SpaceType::CoSpace => __('api.space.open_area'),
+            default => __('api.space.private_area'),
+        };
+
+        $features[] = ['key' => 'area', 'label' => $areaLabel, 'icon' => 'maximize-2'];
+
+        return $features;
+    }
+
+    /**
+     * Data-driven regardless of space type: every entry comes from the
+     * space's own active amenities and the equipment members see in it (plus the
+     * `is_lockable` flag), not a per-`space_type` fabricated list.
+     *
+     * @return array<int, array{key: string, name: string, icon: string}>
+     */
+    private function buildAmenitiesChecklist(Space $space): array
+    {
+        $checklist = [];
+
+        foreach ($this->activeAmenities($space) as $amenity) {
+            $resolved = $this->resolveAmenity($amenity);
+            $checklist[] = [
+                'key' => $resolved['key'],
+                'name' => $resolved['label'],
+                'icon' => $resolved['icon'],
+            ];
+        }
+
+        foreach ($this->equipment->for($space) as $equipment) {
+            $checklist[] = [
+                'key' => $equipment['key'],
+                'name' => $equipment['label'],
+                'icon' => $equipment['icon'],
+            ];
+        }
+
+        if ($space->is_lockable) {
+            $checklist[] = ['key' => 'smart_lock', 'name' => 'Keyless Smart Lock', 'icon' => 'lock'];
+        }
+
+        return array_values($checklist);
+    }
+}

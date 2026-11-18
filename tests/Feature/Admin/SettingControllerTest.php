@@ -1,0 +1,182 @@
+<?php
+
+namespace Tests\Feature\Admin;
+
+use App\Domain\Finance\Services\PointConversionService;
+use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Services\TopUpMinimum;
+use App\Domain\Settings\Enums\SettingValueType;
+use App\Domain\Settings\Services\SettingService;
+use Database\Seeders\RoleSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
+use Spatie\Activitylog\Models\Activity;
+use Tests\TestCase;
+
+class SettingControllerTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(RoleSeeder::class);
+        app(SettingService::class)->set('booking.buffer_minutes', 0, SettingValueType::Int);
+        app(SettingService::class)->set('module.cafe.is_enabled', true, SettingValueType::Bool);
+        app(SettingService::class)->set('app.timezone', 'Asia/Damascus', SettingValueType::String);
+    }
+
+    public function test_an_admin_can_list_settings(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        $response = $this->getJson('/api/v1/admin/settings');
+
+        $response->assertOk();
+        $response->assertJsonFragment(['key' => 'booking.buffer_minutes', 'value' => 0]);
+        $response->assertJsonFragment(['key' => 'module.cafe.is_enabled', 'value' => true]);
+    }
+
+    public function test_an_operations_user_can_list_settings(): void
+    {
+        $operator = User::factory()->create();
+        $operator->assignRole('operations');
+        Sanctum::actingAs($operator, ['*']);
+
+        $this->getJson('/api/v1/admin/settings')->assertOk();
+    }
+
+    public function test_an_admin_can_update_an_int_setting(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        $response = $this->patchJson('/api/v1/admin/settings/booking.buffer_minutes', ['value' => 15]);
+
+        $response->assertOk();
+        $response->assertJson(['message' => __('api.admin.setting_updated')]);
+        $this->assertSame(15, app(SettingService::class)->get('booking.buffer_minutes'));
+    }
+
+    public function test_an_admin_can_update_a_bool_setting(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        $this->patchJson('/api/v1/admin/settings/module.cafe.is_enabled', ['value' => false])->assertOk();
+
+        $this->assertFalse(app(SettingService::class)->get('module.cafe.is_enabled'));
+    }
+
+    public function test_updating_a_setting_rejects_the_wrong_value_type(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        $response = $this->patchJson('/api/v1/admin/settings/booking.buffer_minutes', ['value' => 'not-a-number']);
+
+        $response->assertStatus(422);
+    }
+
+    public function test_updating_an_unknown_key_returns_404(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        $this->patchJson('/api/v1/admin/settings/no.such.key', ['value' => 1])->assertNotFound();
+    }
+
+    public function test_an_operations_user_cannot_update_a_setting(): void
+    {
+        $operator = User::factory()->create();
+        $operator->assignRole('operations');
+        Sanctum::actingAs($operator, ['*']);
+
+        $this->patchJson('/api/v1/admin/settings/booking.buffer_minutes', ['value' => 15])->assertForbidden();
+    }
+
+    public function test_an_admin_can_update_app_timezone_to_a_valid_identifier(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        $response = $this->patchJson('/api/v1/admin/settings/app.timezone', ['value' => 'Europe/London']);
+
+        $response->assertOk();
+        $this->assertSame('Europe/London', app(SettingService::class)->get('app.timezone'));
+    }
+
+    public function test_updating_app_timezone_rejects_an_invalid_identifier(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        $response = $this->patchJson('/api/v1/admin/settings/app.timezone', ['value' => 'Not/AZone']);
+
+        $response->assertStatus(422);
+    }
+
+    public function test_updating_a_setting_writes_an_audit_log_entry(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        $this->patchJson('/api/v1/admin/settings/booking.buffer_minutes', ['value' => 15])->assertOk();
+
+        $activity = Activity::where('description', 'setting_updated')->latest('id')->first();
+
+        $this->assertNotNull($activity);
+        $this->assertSame($admin->id, $activity->causer_id);
+        $this->assertSame(0, $activity->properties['before']);
+        $this->assertSame(15, $activity->properties['after']);
+    }
+
+    public function test_the_minimum_top_up_must_be_a_whole_number_of_at_least_one_point(): void
+    {
+        app(SettingService::class)->set(TopUpMinimum::SETTING_KEY, 10, SettingValueType::Int);
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        foreach ([0, -5, 2.5, 'ten'] as $invalid) {
+            $this->patchJson('/api/v1/admin/settings/wallet.top_up_min_points', ['value' => $invalid])
+                ->assertJsonValidationErrors('value');
+        }
+
+        $this->patchJson('/api/v1/admin/settings/wallet.top_up_min_points', ['value' => 25])->assertOk();
+        $this->assertSame(25, app(TopUpMinimum::class)->points());
+    }
+
+    /**
+     * `numeric|decimal:0,4` alone also accepts `.05`, `5.` and `+0.10`, which
+     * the dashboard's exact arithmetic cannot parse — only plain decimals.
+     */
+    public function test_the_point_rate_must_be_a_plain_decimal_of_at_most_four_places(): void
+    {
+        app(SettingService::class)->set(PointConversionService::SETTING_KEY, '0.10', SettingValueType::String);
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        foreach (['.05', '5.', '+0.10', '0.00001', '-1', '0', 'abc', '1e-2'] as $invalid) {
+            $this->patchJson('/api/v1/admin/settings/point.rate_usd', ['value' => $invalid])
+                ->assertJsonValidationErrors('value');
+        }
+
+        $this->assertSame('0.10', app(PointConversionService::class)->rate());
+
+        foreach (['0.05', '0.0500', '5', '12.5'] as $valid) {
+            $this->patchJson('/api/v1/admin/settings/point.rate_usd', ['value' => $valid])->assertOk();
+            $this->assertSame($valid, app(PointConversionService::class)->rate());
+        }
+    }
+}

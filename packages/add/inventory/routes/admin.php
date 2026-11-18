@@ -1,0 +1,141 @@
+<?php
+
+use Add\Inventory\Assets\Http\Controllers\AssetAdditionController;
+use Add\Inventory\Assets\Http\Controllers\AssetController;
+use Add\Inventory\Assets\Http\Controllers\CustodyController;
+use Add\Inventory\Assets\Http\Controllers\MaintenanceController;
+use Add\Inventory\Assets\Http\Controllers\MaintenanceScheduleController;
+use Add\Inventory\Authorization\Abilities;
+use Add\Inventory\Catalog\Http\Controllers\AttributeDefinitionController;
+use Add\Inventory\Catalog\Http\Controllers\CategoryController;
+use Add\Inventory\Catalog\Http\Controllers\ItemController;
+use Add\Inventory\Catalog\Http\Controllers\LocationController;
+use Add\Inventory\Catalog\Http\Controllers\UnitController;
+use Add\Inventory\Inventory;
+use Add\Inventory\Reports\Http\Controllers\ReportController;
+use Add\Inventory\Settings\Http\ManageSettingsController;
+use Add\Inventory\Stock\Http\Controllers\StockController;
+use Add\Inventory\Support\Http\SettingsController;
+use Add\Inventory\Warehouses\Http\Controllers\WarehouseController;
+use Add\Inventory\Warehouses\Http\Controllers\WarehouseMinimumController;
+use Illuminate\Support\Facades\Route;
+
+/*
+ * Inventory administration. Mounted by Inventory::adminRoutes() inside the
+ * host's own authenticated group; each route checks its own ability.
+ */
+
+$catalog = [
+    'categories' => [CategoryController::class, 'category'],
+    'units' => [UnitController::class, 'unit'],
+    'items' => [ItemController::class, 'item'],
+];
+
+// The package's own places, only while the host has none of its own.
+if (Inventory::ownsLocations()) {
+    $catalog['locations'] = [LocationController::class, 'location'];
+}
+
+Route::middleware('can:'.Abilities::CATALOG_VIEW)->group(function () use ($catalog) {
+    foreach ($catalog as $uri => [$controller, $parameter]) {
+        Route::apiResource($uri, $controller)->only(['index', 'show'])->parameters([$uri => $parameter]);
+    }
+
+    Route::get('items/barcode/{barcode}', [ItemController::class, 'byBarcode'])->name('items.barcode');
+});
+
+Route::middleware('can:'.Abilities::CATALOG_MANAGE)->group(function () use ($catalog) {
+    foreach ($catalog as $uri => [$controller, $parameter]) {
+        Route::apiResource($uri, $controller)->only(['store', 'update', 'destroy'])->parameters([$uri => $parameter]);
+    }
+
+    Route::post('items/barcodes', [ItemController::class, 'generateBarcode'])->name('items.barcodes');
+    Route::post('categories/{category}/fields', [AttributeDefinitionController::class, 'store'])->name('fields.store');
+    Route::match(['put', 'patch'], 'fields/{attributeDefinition}', [AttributeDefinitionController::class, 'update'])->name('fields.update');
+    Route::delete('fields/{attributeDefinition}', [AttributeDefinitionController::class, 'destroy'])->name('fields.destroy');
+});
+
+// Assets
+Route::middleware('can:'.Abilities::ASSETS_VIEW)->group(function () {
+    Route::get('assets', [AssetController::class, 'index'])->name('assets.index');
+    Route::get('assets/qr/{token}', [AssetController::class, 'scan'])->name('assets.scan');
+    Route::get('assets/{asset}', [AssetController::class, 'show'])->name('assets.show');
+    Route::get('custody', [CustodyController::class, 'index'])->name('custody.index');
+    Route::get('maintenance', [MaintenanceController::class, 'index'])->name('maintenance.index');
+    Route::get('assets/{asset}/maintenance-schedules', [MaintenanceScheduleController::class, 'index'])->name('maintenance-schedules.index');
+    Route::get('assets/{asset}/additions', [AssetAdditionController::class, 'index'])->name('asset-additions.index');
+    Route::get('maintenance-schedules/due', [MaintenanceScheduleController::class, 'due'])->name('maintenance-schedules.due');
+});
+
+Route::middleware('can:'.Abilities::ASSETS_MANAGE)->group(function () {
+    Route::post('assets', [AssetController::class, 'store'])->name('assets.store');
+    Route::post('assets/batch', [AssetController::class, 'storeBatch'])->name('assets.store-batch');
+    Route::match(['put', 'patch'], 'assets/{asset}', [AssetController::class, 'update'])->name('assets.update');
+    Route::patch('assets/{asset}/status', [AssetController::class, 'status'])->name('assets.status');
+    Route::post('assets/{asset}/move', [AssetController::class, 'move'])->name('assets.move');
+    Route::delete('assets/{asset}', [AssetController::class, 'destroy'])->name('assets.destroy');
+    Route::post('assets/{asset}/additions', [AssetAdditionController::class, 'store'])->name('asset-additions.store');
+    Route::delete('asset-additions/{addition}', [AssetAdditionController::class, 'destroy'])->name('asset-additions.destroy');
+});
+
+Route::middleware('can:'.Abilities::ASSETS_CUSTODY)->group(function () {
+    Route::post('assets/{asset}/assign', [AssetController::class, 'assign'])->name('assets.assign');
+    Route::post('assets/{asset}/return', [AssetController::class, 'takeBack'])->name('assets.return');
+});
+
+Route::middleware('can:'.Abilities::ASSETS_MAINTENANCE)->group(function () {
+    Route::post('assets/{asset}/maintenance', [MaintenanceController::class, 'open'])->name('maintenance.open');
+    Route::post('maintenance/{record}/close', [MaintenanceController::class, 'close'])->name('maintenance.close');
+    Route::post('assets/{asset}/maintenance-schedules', [MaintenanceScheduleController::class, 'store'])->name('maintenance-schedules.store');
+    Route::match(['put', 'patch'], 'maintenance-schedules/{schedule}', [MaintenanceScheduleController::class, 'update'])->name('maintenance-schedules.update');
+    Route::delete('maintenance-schedules/{schedule}', [MaintenanceScheduleController::class, 'destroy'])->name('maintenance-schedules.destroy');
+});
+
+Route::post('assets/{asset}/approve', [AssetController::class, 'approve'])
+    ->middleware('can:'.Abilities::ASSETS_APPROVE)->name('assets.approve');
+
+Route::post('assets/{asset}/dispose', [AssetController::class, 'dispose'])
+    ->middleware('can:'.Abilities::ASSETS_DISPOSE)->name('assets.dispose');
+
+// What the package is set to do, for a host's screens to follow.
+Route::get('settings', SettingsController::class)->name('settings');
+
+// The settings page: what the dashboard may change over the config file.
+Route::middleware('can:'.Abilities::SETTINGS_MANAGE)->group(function () {
+    Route::get('settings/manage', [ManageSettingsController::class, 'index'])->name('settings.manage');
+    Route::patch('settings', [ManageSettingsController::class, 'update'])->name('settings.update');
+});
+
+// Warehouses: where stock is kept
+Route::middleware('can:'.Abilities::WAREHOUSES_VIEW)->group(function () {
+    Route::apiResource('warehouses', WarehouseController::class)->only(['index', 'show']);
+    Route::get('warehouses/{warehouse}/minimums', [WarehouseMinimumController::class, 'index'])->name('warehouses.minimums.index');
+});
+
+Route::middleware('can:'.Abilities::WAREHOUSES_MANAGE)->group(function () {
+    Route::apiResource('warehouses', WarehouseController::class)->only(['store', 'update', 'destroy']);
+    Route::put('warehouses/{warehouse}/minimums', [WarehouseMinimumController::class, 'update'])->name('warehouses.minimums.update');
+});
+
+// Stock
+Route::middleware('can:'.Abilities::STOCK_VIEW)->group(function () {
+    Route::get('stock/balances', [StockController::class, 'balances'])->name('stock.balances');
+    Route::get('stock/movements', [StockController::class, 'movements'])->name('stock.movements');
+    Route::get('stock/operations', [StockController::class, 'operations'])->name('stock.operations');
+    Route::get('stock/operations/{operation}', [StockController::class, 'operation'])->name('stock.operation');
+});
+
+Route::post('stock/receive', [StockController::class, 'receive'])
+    ->middleware('can:'.Abilities::STOCK_RECEIVE)->name('stock.receive');
+Route::post('stock/issue', [StockController::class, 'issue'])
+    ->middleware('can:'.Abilities::STOCK_ISSUE)->name('stock.issue');
+Route::post('stock/transfer', [StockController::class, 'transfer'])
+    ->middleware('can:'.Abilities::STOCK_TRANSFER)->name('stock.transfer');
+Route::post('stock/adjust', [StockController::class, 'adjust'])
+    ->middleware('can:'.Abilities::STOCK_ADJUST)->name('stock.adjust');
+
+// Reports
+Route::middleware('can:'.Abilities::REPORTS_VIEW)->group(function () {
+    Route::get('reports/stock-valuation', [ReportController::class, 'stockValuation'])->name('reports.stock-valuation');
+    Route::get('reports/asset-register', [ReportController::class, 'assetRegister'])->name('reports.asset-register');
+});

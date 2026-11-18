@@ -1,0 +1,55 @@
+<?php
+
+namespace App\Http\Resources\Kitchen;
+
+use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Foundation\Models\Branch;
+use App\Domain\Retail\Models\SaleItem;
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+/**
+ * The member's kitchen menu: the branch, whether they may order now (and
+ * why not), the bills they could order onto, the route their order takes,
+ * how they may pay (and from which wallets), and what the kitchen holds.
+ * The place comes from the scan (POST member/scan), not from here. Built from
+ * an array: `{access: MenuAccess::for(), items: one page of KitchenMenu::for(),
+ * meta: that page's counters}`.
+ *
+ * @property array{access: array{branch_id: ?int, can_order: bool, reason: ?string, bills: list<Booking|WalkinSession>, route: string, payment_methods: list<string>, wallets: list<array<string, mixed>>}, items: list<array{sale_item: SaleItem, available: string}>, meta: array{current_page: int, last_page: int, per_page: int, total: int}} $resource
+ */
+class KitchenMenuResource extends JsonResource
+{
+    /**
+     * @return array<string, mixed>
+     */
+    public function toArray(Request $request): array
+    {
+        ['access' => $access, 'items' => $items, 'meta' => $meta] = $this->resource;
+        $branch = $access['branch_id'] === null ? null : Branch::query()->find($access['branch_id']);
+
+        return [
+            'branch' => $branch === null ? null : ['id' => $branch->id, 'name' => $branch->translate('name')],
+            'can_order' => $access['can_order'],
+            'reason' => $access['reason'],
+            'bills' => array_map(fn (Booking|WalkinSession $bill) => [
+                'type' => $bill->coworkingType(),
+                'id' => $bill->id,
+                'label' => $bill->space->displayTitle(),
+            ], $access['bills']),
+            'route' => $access['route'],
+            'payment_methods' => $access['payment_methods'],
+            'wallets' => $access['wallets'],
+            'items' => array_map(fn (array $entry) => [
+                'sale_item_id' => $entry['sale_item']->id,
+                'name' => $entry['sale_item']->item->translate('name'),
+                'image_url' => $entry['sale_item']->item->image_url,
+                'price_points' => $entry['sale_item']->price_points,
+                // Stock items are counted whole; a fraction left is not one more.
+                'available_quantity' => (int) bcadd($entry['available'], '0', 0),
+            ], $items),
+            'meta' => $meta,
+        ];
+    }
+}

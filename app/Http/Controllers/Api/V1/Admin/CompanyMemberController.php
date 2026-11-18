@@ -1,0 +1,117 @@
+<?php
+
+namespace App\Http\Controllers\Api\V1\Admin;
+
+use App\Concerns\LogsSensitiveActions;
+use App\Domain\Identity\Models\Company;
+use App\Domain\Identity\Models\User;
+use App\Domain\Identity\Services\CompanyNotifier;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\StoreCompanyMemberRequest;
+use App\Http\Requests\Admin\UpdateCompanyMemberAdminRequest;
+use App\Http\Requests\Admin\UpdateCompanyMemberRequest;
+use App\Http\Resources\CompanyMemberResource;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Response;
+
+/**
+ * Adding a member and toggling their door-access flag are both operations
+ * capabilities (PRD §4: "إنشاء حسابات الشركات وإضافة أعضائها"), gated by the
+ * `companies.manage_members` permission (listing: `companies.view`) — any
+ * role holding it, operations included.
+ */
+class CompanyMemberController extends Controller
+{
+    use LogsSensitiveActions;
+
+    public function __construct(private readonly CompanyNotifier $notices) {}
+
+    public function index(Company $company): AnonymousResourceCollection
+    {
+        return CompanyMemberResource::collection(
+            $company->memberships()->with(['user' => fn ($query) => $query->withTrashed()])->get()
+        );
+    }
+
+    public function store(StoreCompanyMemberRequest $request, Company $company): JsonResponse
+    {
+        $company->members()->attach($request->validated('user_id'), [
+            'door_access_enabled' => $request->boolean('door_access_enabled'),
+            'is_admin' => $request->boolean('is_admin'),
+        ]);
+
+        $membership = $company->members()->where('users.id', $request->validated('user_id'))->first();
+
+        $this->logSensitiveAction('company_member_added', $company, [
+            'user_id' => $request->validated('user_id'),
+            'door_access_enabled' => $request->boolean('door_access_enabled'),
+            'is_admin' => $request->boolean('is_admin'),
+        ]);
+
+        $this->notices->joined($company, $membership);
+
+        // attach() is a raw insert, not an Eloquent create() — Laravel's
+        // usual wasRecentlyCreated-based auto-201 doesn't fire here, so it's
+        // set explicitly instead of relying on that implicit detection.
+        return (new CompanyMemberResource($membership->pivot))
+            ->response()
+            ->setStatusCode(Response::HTTP_CREATED);
+    }
+
+    public function updateDoorAccess(UpdateCompanyMemberRequest $request, Company $company, User $user): JsonResponse
+    {
+        $before = $this->notices->flags($company, $user)['door_access_enabled'] ?? null;
+
+        $company->members()->updateExistingPivot($user->id, [
+            'door_access_enabled' => $request->validated('door_access_enabled'),
+        ]);
+
+        $this->notices->doorAccessChanged($company, $user, $before, $request->boolean('door_access_enabled'), $request->user());
+
+        $this->logSensitiveAction('company_member_door_access_changed', $company, [
+            'user_id' => $user->id,
+            'door_access_enabled' => $request->validated('door_access_enabled'),
+        ]);
+
+        return response()->json(['message' => __('api.admin.company_member_door_access_updated')]);
+    }
+
+    /**
+     * Operations grants/revokes company-admin status unconditionally — not
+     * via a Gate::before/Policy bypass, this controller never calls
+     * CompanyPolicy::manageMembers() at all, so the route's
+     * `companies.manage_members` permission is its only authorization. This is also the only way a
+     * company ever gets its first admin, since a company admin can only
+     * grant is_admin to an *existing* member (CompanyPolicy::manageMembers,
+     * enforced on the member-facing endpoint instead).
+     */
+    public function updateAdmin(UpdateCompanyMemberAdminRequest $request, Company $company, User $user): JsonResponse
+    {
+        $before = $this->notices->flags($company, $user)['is_admin'] ?? null;
+
+        $company->members()->updateExistingPivot($user->id, [
+            'is_admin' => $request->validated('is_admin'),
+        ]);
+
+        $this->notices->adminChanged($company, $user, $before, $request->boolean('is_admin'), $request->user());
+
+        $this->logSensitiveAction('company_member_admin_changed', $company, [
+            'user_id' => $user->id,
+            'is_admin' => $request->validated('is_admin'),
+        ]);
+
+        return response()->json(['message' => __('api.admin.company_member_admin_updated')]);
+    }
+
+    public function destroy(Company $company, User $user): Response
+    {
+        if ($company->members()->detach($user->id) > 0) {
+            $this->notices->removed($company, $user);
+        }
+
+        $this->logSensitiveAction('company_member_removed', $company, ['user_id' => $user->id]);
+
+        return response()->noContent();
+    }
+}

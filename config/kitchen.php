@@ -1,0 +1,17 @@
+<?php
+
+/*
+ * How long a kitchen order may wait before the system cancels it (and
+ * refunds what was paid). Both windows are in minutes.
+ */
+return [
+
+    // An order awaiting reception's decision, from when it reached reception's queue.
+    // A blank value in .env would read as 0 and cancel every order within a
+    // minute of sending it, so it falls back to the default.
+    'reception_window_minutes' => (int) env('KITCHEN_RECEPTION_WINDOW_MINUTES', 15) ?: 15,
+
+    // A pending order the kitchen has not accepted, from when it reached the kitchen.
+    'accept_window_minutes' => (int) env('KITCHEN_ACCEPT_WINDOW_MINUTES', 15) ?: 15,
+
+];

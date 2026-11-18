@@ -1,0 +1,135 @@
+<?php
+
+namespace App\Domain\Services\Models;
+
+use App\Casts\AsMediaUrl;
+use App\Concerns\HasTranslations;
+use App\Domain\Forms\Concerns\InteractsWithForms;
+use App\Domain\Forms\Contracts\HasForms;
+use App\Domain\Forms\Enums\FormPurpose;
+use App\Domain\Services\Enums\RequestMethod;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
+
+class ServiceType extends Model implements HasForms
+{
+    use HasTranslations, InteractsWithForms;
+
+    protected $fillable = [
+        'service_axis_id',
+        'slug',
+        'name',
+        'description',
+        'about',
+        'icon',
+        'image_url',
+        'is_active',
+        'is_coming_soon',
+        'show_on_home',
+        'requires_location',
+        'requires_review',
+        'visibility',
+        'request_method',
+        'request_config',
+        'allowed_plan_module_ids',
+        'order',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'name' => 'array',
+            'description' => 'array',
+            'about' => 'array',
+            'image_url' => AsMediaUrl::class,
+            'is_active' => 'boolean',
+            'is_coming_soon' => 'boolean',
+            'show_on_home' => 'boolean',
+            'requires_location' => 'boolean',
+            'requires_review' => 'boolean',
+            'request_method' => RequestMethod::class,
+            'request_config' => 'array',
+            'allowed_plan_module_ids' => 'array',
+            'order' => 'integer',
+        ];
+    }
+
+    // ── Relationships ────────────────────────────────────────────────────────
+
+    public function axis(): BelongsTo
+    {
+        return $this->belongsTo(ServiceAxis::class, 'service_axis_id');
+    }
+
+    /** The questions a member answers when filing a request of this type. */
+    public function requestForm(): MorphOne
+    {
+        return $this->form(FormPurpose::Request);
+    }
+
+    public function requests(): HasMany
+    {
+        return $this->hasMany(ServiceRequest::class);
+    }
+
+    // ── Scopes ───────────────────────────────────────────────────────────────
+
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('is_active', true);
+    }
+
+    /** The services a member may see: active, member-facing, and open to the plan modules they hold. */
+    public function scopeVisibleToMember(Builder $query, array $moduleIds): Builder
+    {
+        return $query->active()
+            ->where(fn (Builder $q) => $q->where('visibility', 'member')->orWhere('visibility', 'both'))
+            ->accessibleByModules($moduleIds);
+    }
+
+    public function scopeOrdered(Builder $query): Builder
+    {
+        return $query->orderBy('order');
+    }
+
+    /**
+     * Filter to service types accessible to the given plan module IDs.
+     * A null `allowed_plan_module_ids` means open to all.
+     */
+    public function scopeAccessibleByModules(Builder $query, array $moduleIds): Builder
+    {
+        return $query->where(function (Builder $q) use ($moduleIds) {
+            $q->whereNull('allowed_plan_module_ids');
+
+            foreach ($moduleIds as $id) {
+                $q->orWhereJsonContains('allowed_plan_module_ids', $id);
+            }
+        });
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    /**
+     * Whether this service type creates a ServiceRequest record when actioned.
+     * Non-form methods (phone, link, ...) handle the interaction client-side.
+     */
+    public function createsRequest(): bool
+    {
+        return $this->request_method->createsRequest();
+    }
+
+    /**
+     * Whether the given plan module IDs grant access to this service.
+     */
+    public function isAccessibleByModules(array $moduleIds): bool
+    {
+        if ($this->allowed_plan_module_ids === null) {
+            return true;
+        }
+
+        return ! empty(array_intersect($this->allowed_plan_module_ids, $moduleIds));
+    }
+}

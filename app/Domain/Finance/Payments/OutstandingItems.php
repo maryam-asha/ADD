@@ -1,0 +1,348 @@
+<?php
+
+namespace App\Domain\Finance\Payments;
+
+use App\Domain\Booking\Enums\BookingStatus;
+use App\Domain\Booking\Enums\PaymentState;
+use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Ecosystem\Models\EventAttendee;
+use App\Domain\Finance\Enums\PaymentPurpose;
+use App\Domain\Finance\Enums\PaymentStatus;
+use App\Domain\Finance\Models\Payment;
+use App\Domain\Finance\Payments\Methods\CashMethod;
+use App\Domain\Finance\Services\ReceivedMoneyConverter;
+use App\Domain\Identity\Models\User;
+use App\Domain\Kitchen\Enums\KitchenOrderStatus;
+use App\Domain\Kitchen\Models\KitchenOrder;
+use App\Domain\Pricing\Services\PriceQuoteService;
+use App\Support\Enums\EventPaymentState;
+use App\Support\Enums\EventRegistrationStatus;
+use App\Support\PlainAmount;
+use Closure;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
+
+/**
+ * Everything one member still owes, for the reception desk to settle in one
+ * visit: unpaid bookings in a payable status (never cancelled, rejected or a
+ * no-show — docs/decisions/booking-outcomes-and-extension.md), closed unpaid
+ * coworking sessions, approved unpaid registrations for paid events,
+ * plans they chose to pay for in cash whose hold is still open, and unpaid
+ * kitchen orders on a session or booking that has closed — each its own
+ * payable beside the bill (kitchen orders spec, decision 11); one on a bill
+ * still open is settled with it at checkout.
+ *
+ * Each item names what POST admin/reception/payments/settle takes to settle
+ * it (`purpose` plus `payable_id`, or `payment_id` for a held plan) and what
+ * it costs, in points and in `$currency`.
+ */
+class OutstandingItems
+{
+    public function __construct(
+        private readonly ReceivedMoneyConverter $converter,
+        private readonly PriceQuoteService $quotes,
+    ) {}
+
+    /**
+     * @return array{items: list<array<string, mixed>>, total_points: int, total_amount: array{value: string, currency: string}}
+     */
+    public function for(int $userId, string $currency): array
+    {
+        $items = $this->priced($this->owed(fn (Builder $query) => $query->where('user_id', $userId)), $currency);
+
+        $total = (int) array_sum(array_column($items, 'amount_points'));
+
+        return [
+            'items' => $items,
+            'total_points' => $total,
+            'total_amount' => ['value' => PlainAmount::of($this->converter->pointsToAmount($total, $currency)), 'currency' => $currency],
+        ];
+    }
+
+    /**
+     * Everything owed by every member — the reception desk's "pending
+     * payments" list, the rows countAll() counts — each naming its member,
+     * optionally narrowed to members whose name or phone holds `$search`.
+     * What was used already comes first, oldest first, then what is still to
+     * happen, then held plans; only the page returned is priced.
+     *
+     * @return LengthAwarePaginator<int, array<string, mixed>>
+     */
+    public function forEveryone(string $currency, ?string $search, int $page, int $perPage): LengthAwarePaginator
+    {
+        $search = trim((string) $search);
+
+        $items = collect($this->owed(fn (Builder $query) => $search === '' ? $query : $query->whereHas('user', function (Builder $user) use ($search) {
+            $user->nameLike($search)->orWhere('phone', 'like', "%{$search}%");
+        })))
+            ->sortBy(fn (array $item) => $item['starts_at'] === null ? PHP_INT_MAX : strtotime($item['starts_at']))
+            ->values();
+
+        return new LengthAwarePaginator(
+            $this->priced($items->forPage($page, $perPage)->values()->all(), $currency),
+            $items->count(),
+            $perPage,
+            $page,
+        );
+    }
+
+    /**
+     * Every kind of owed row, each narrowed by `$scope` the same way.
+     *
+     * @param  Closure(Builder): mixed  $scope
+     * @return list<array<string, mixed>>
+     */
+    private function owed(Closure $scope): array
+    {
+        return [
+            ...$this->bookings($scope),
+            ...$this->sessions($scope),
+            ...$this->registrations($scope),
+            ...$this->heldPlans($scope),
+            ...$this->kitchenOrders($scope),
+        ];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $items
+     * @return list<array<string, mixed>>
+     */
+    private function priced(array $items, string $currency): array
+    {
+        foreach ($items as &$item) {
+            $item['amount'] = ['value' => PlainAmount::of($this->converter->pointsToAmount($item['amount_points'], $currency)), 'currency' => $currency];
+        }
+        unset($item);
+
+        return $items;
+    }
+
+    /** @return array{id: int, name: string|null, phone: string|null}|null */
+    private function member(?User $user): ?array
+    {
+        return $user === null ? null : ['id' => $user->id, 'name' => $user->name, 'phone' => $user->phone];
+    }
+
+    /**
+     * What each booking still owes: its price less what was already paid
+     * for it — a paid booking that was then extended owes the extension.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function bookings(Closure $scope): array
+    {
+        return $this->bookingsOwed()
+            ->with(['space', 'payments', 'user:id,name,phone'])
+            ->where($scope)
+            ->orderBy('start_at')
+            ->get()
+            ->map(fn (Booking $b) => [
+                'purpose' => PaymentPurpose::Booking->value,
+                'payable_id' => $b->id,
+                'member' => $this->member($b->user),
+                'title' => $b->space?->translate('name'),
+                'starts_at' => $b->start_at?->toIso8601String(),
+                'amount_points' => max(0, (int) $b->price_points - $b->pointsPaid()),
+            ])
+            ->filter(fn (array $item) => $item['amount_points'] > 0)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function sessions(Closure $scope): array
+    {
+        return $this->sessionsOwed()
+            ->with(['space', 'user:id,name,phone'])
+            ->where($scope)
+            ->orderBy('checked_in_at')
+            ->get()
+            ->map(fn (WalkinSession $s) => [
+                'purpose' => PaymentPurpose::CoworkingSession->value,
+                'payable_id' => $s->id,
+                'member' => $this->member($s->user),
+                'title' => $s->space?->translate('name'),
+                'starts_at' => $s->checked_in_at?->toIso8601String(),
+                'amount_points' => (int) $s->price_points,
+            ])
+            ->all();
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function registrations(Closure $scope): array
+    {
+        return $this->registrationsOwed()
+            ->with(['event', 'user:id,name,phone'])
+            ->where($scope)
+            ->orderBy('id')
+            ->get()
+            ->map(fn (EventAttendee $a) => [
+                'purpose' => PaymentPurpose::EventRegistration->value,
+                'payable_id' => $a->id,
+                'member' => $this->member($a->user),
+                'title' => $a->event?->translate('title'),
+                'starts_at' => $a->event?->start_at?->toIso8601String(),
+                'amount_points' => (int) $a->price_points,
+            ])
+            ->all();
+    }
+
+    /**
+     * Held for the member who chose cash — for themselves, or for a company
+     * they buy for.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function heldPlans(Closure $scope): array
+    {
+        return $this->plansHeld()
+            ->with(['plan', 'user:id,name,phone'])
+            ->where($scope)
+            ->orderBy('id')
+            ->get()
+            ->map(fn (Payment $p) => [
+                'purpose' => PaymentPurpose::PlanPurchase->value,
+                'payment_id' => $p->id,
+                'member' => $this->member($p->user),
+                'title' => $p->plan?->translate('name'),
+                'starts_at' => null,
+                // What the desk will charge: the plan as it is now, at the
+                // sale and coupon the hold was opened with.
+                'amount_points' => $p->plan !== null ? $this->quotes->forPlanPayment($p, $p->plan)->finalPoints : (int) $p->amount_points,
+            ])
+            ->all();
+    }
+
+    /**
+     * Accepted, unpaid orders whose session or booking has closed, each
+     * settled on its own (`purpose` kitchen_order).
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function kitchenOrders(Closure $scope): array
+    {
+        return $this->kitchenOrdersOwed()
+            ->with(['user:id,name,phone'])
+            ->where($scope)
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (KitchenOrder $o) => [
+                'purpose' => PaymentPurpose::KitchenOrder->value,
+                'payable_id' => $o->id,
+                'member' => $this->member($o->user),
+                'title' => __('api.kitchen_order.description', ['id' => $o->id]),
+                'starts_at' => $o->created_at?->toIso8601String(),
+                'amount_points' => (int) $o->total_points,
+            ])
+            ->all();
+    }
+
+    /**
+     * The member's walk-ins and bookings that have closed and still owe, by
+     * the same rules the desk lists them by, newest close first — the home
+     * screen's awaiting_payment cards come from it. Upcoming bookings not paid yet are not here:
+     * they are still to happen.
+     *
+     * One that owes nothing itself — paid, or covered by its plan — is here
+     * too while an accepted kitchen order on it is unpaid: it is not settled
+     * until they are (kitchen orders spec, "The bill").
+     *
+     * @return Collection<int, Booking|WalkinSession>
+     */
+    public function closedFor(int $userId): Collection
+    {
+        $withOrders = $this->kitchenOrdersOwed()->where('user_id', $userId)->get(['billable_type', 'billable_id']);
+        $bookingIds = $withOrders->where('billable_type', (new Booking)->getMorphClass())->pluck('billable_id')->unique()->values()->all();
+        $sessionIds = $withOrders->where('billable_type', (new WalkinSession)->getMorphClass())->pluck('billable_id')->unique()->values()->all();
+
+        $bookings = Booking::query()
+            ->where('user_id', $userId)
+            ->whereNotNull('checked_out_at')
+            ->where(fn (Builder $owed) => $owed->whereIn('id', $this->bookingsOwed()->select('id'))->orWhereIn('id', $bookingIds))
+            ->with(['space.building.branch', 'payments'])
+            ->get()
+            ->filter(fn (Booking $booking) => in_array($booking->id, $bookingIds, true) || (int) $booking->price_points > $booking->pointsPaid());
+
+        $sessions = WalkinSession::query()
+            ->where('user_id', $userId)
+            ->where(fn (Builder $owed) => $owed->whereIn('id', $this->sessionsOwed()->select('id'))->orWhereIn('id', $sessionIds))
+            ->with(['space.building.branch', 'payments'])
+            ->get();
+
+        return $bookings->toBase()
+            ->concat($sessions)
+            ->sortByDesc(fn (Booking|WalkinSession $owed) => $owed->checked_out_at->getTimestamp())
+            ->values();
+    }
+
+    /**
+     * How many items are owed across every member — the reception desk's
+     * "pending payments" — by the same rules for() lists one member's by.
+     */
+    public function countAll(): int
+    {
+        return $this->bookingsOwed()->count()
+            + $this->sessionsOwed()->count()
+            + $this->registrationsOwed()->count()
+            + $this->plansHeld()->count()
+            + $this->kitchenOrdersOwed()->count();
+    }
+
+    /** @return Builder<Booking> */
+    private function bookingsOwed(): Builder
+    {
+        return Booking::query()
+            ->whereIn('status', BookingStatus::payable())
+            ->where('payment_state', PaymentState::Unpaid)
+            ->where('price_points', '>', 0);
+    }
+
+    /** @return Builder<WalkinSession> */
+    private function sessionsOwed(): Builder
+    {
+        return WalkinSession::query()
+            ->whereNotNull('checked_out_at')
+            ->where('payment_state', PaymentState::Unpaid)
+            ->where('price_points', '>', 0);
+    }
+
+    /** @return Builder<EventAttendee> */
+    private function registrationsOwed(): Builder
+    {
+        return EventAttendee::query()
+            ->where('status', EventRegistrationStatus::Approved)
+            ->where('payment_state', EventPaymentState::Unpaid)
+            ->where('price_points', '>', 0);
+    }
+
+    /**
+     * Accepted (so owed), unpaid, and on a bill that has closed.
+     *
+     * @return Builder<KitchenOrder>
+     */
+    private function kitchenOrdersOwed(): Builder
+    {
+        return KitchenOrder::query()
+            ->whereIn('status', KitchenOrderStatus::owedValues())
+            ->whereNull('paid_at')
+            ->where('total_points', '>', 0)
+            ->whereHasMorph('billable', [Booking::class, WalkinSession::class], fn (Builder $bill) => $bill->whereNotNull('checked_out_at'));
+    }
+
+    /** @return Builder<Payment> */
+    private function plansHeld(): Builder
+    {
+        return Payment::query()
+            ->where('method', CashMethod::KEY)
+            ->where('purpose', PaymentPurpose::PlanPurchase)
+            ->where('status', PaymentStatus::Pending)
+            ->where('expires_at', '>', now());
+    }
+}

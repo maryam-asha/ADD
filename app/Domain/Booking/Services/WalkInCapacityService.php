@@ -1,0 +1,312 @@
+<?php
+
+namespace App\Domain\Booking\Services;
+
+use App\Domain\Booking\DataTransferObjects\WalkInStartResult;
+use App\Domain\Booking\Enums\BookingStatus;
+use App\Domain\Booking\Enums\PaymentState;
+use App\Domain\Booking\Enums\SessionStartSource;
+use App\Domain\Booking\Exceptions\ReceptionActionException;
+use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\GuestVisit;
+use App\Domain\Booking\Models\Kiosk;
+use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Booking\ValueObjects\PoolDemand;
+use App\Domain\Foundation\Enums\SpaceType;
+use App\Domain\Foundation\Models\Branch;
+use App\Domain\Foundation\Models\Space;
+use App\Domain\Foundation\Services\BusinessHoursService;
+use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Enums\CoverageReason;
+use App\Domain\Membership\Services\MembershipResolver;
+use App\Domain\Membership\Services\PlanAllowanceService;
+use App\Domain\Membership\Services\SessionCoverageEvaluator;
+use App\Domain\Membership\ValueObjects\SessionCoverage;
+use Illuminate\Support\Facades\DB;
+
+class WalkInCapacityService
+{
+    public function __construct(
+        private readonly BusinessHoursService $businessHours,
+        private readonly MembershipResolver $memberships,
+        private readonly PlanAllowanceService $allowances,
+        private readonly AvailabilityService $availability,
+        private readonly SessionCoverageEvaluator $coverage,
+        private readonly OpenCoworkingSessionLocator $openSessions,
+        private readonly ArrivalRequestMatcher $bookings,
+    ) {}
+
+    /**
+     * A co_space — or a room lent to co-working right now — seats a walk-in
+     * from its branch's co-working pool: subscriptions holding their seats,
+     * bookings, and the people already inside all count, and a subscriber
+     * inside their plan's hours sits in the seat they hold
+     * (docs/decisions/coworking-seat-pool.md).
+     *
+     * Any other space keeps its own physical-presence count: checked-in,
+     * not checked-out bookings plus open walk-ins against Space.capacity,
+     * with `capacity === null` treated as unlimited.
+     */
+    public function start(
+        Space $space,
+        User $member,
+        SessionStartSource $via = SessionStartSource::Reception,
+        ?Kiosk $kiosk = null,
+        bool $acceptedUncovered = false,
+        ?SessionCoverage $coverage = null,
+    ): WalkInStartResult {
+        return DB::transaction(function () use ($space, $member, $via, $kiosk, $acceptedUncovered, $coverage) {
+            [$locked, $seatCovered] = $this->admit($space, $member);
+
+            // Stamped now, not re-resolved at checkout: it pins which
+            // subscription was in force when the session started.
+            $membership = $this->memberships->activeFor($member);
+
+            $session = WalkinSession::create([
+                'space_id' => $locked->id,
+                'user_id' => $member->id,
+                'membership_id' => $membership?->id,
+                'seat_covered' => $seatCovered,
+                'checked_in_at' => now(),
+                'payment_state' => PaymentState::Unpaid,
+                'started_via' => $via,
+                'kiosk_id' => $kiosk?->id,
+                'accepted_uncovered' => $acceptedUncovered,
+                // Taken for every walk-in, reception or scan, so the reception
+                // list shows the same plan picture for both. A scan passes the
+                // coverage it already showed the member, so the snapshot is
+                // exactly what they agreed to.
+                'coverage_snapshot' => ($coverage ?? $this->coverage->evaluate($member, now()))->toArray(),
+                'handover_booking_id' => $this->laterBookingFor($locked, $member)?->id,
+            ]);
+
+            // Someone in a guest's grace who starts their own session is no
+            // longer a guest: the visit ends on it.
+            if ($locked->space_type === SpaceType::CoSpace) {
+                GuestVisit::endOnOwnSession($member, $session);
+            }
+
+            // A plan with an access window that isn't open right now does not
+            // block the session — it just isn't covering it, which reception
+            // needs told. Anyone without such a plan gets no notice at all,
+            // since nothing about their session changed.
+            $plan = $membership?->plan;
+
+            if ($plan === null || ! $plan->hasAccessWindow()
+                || ! $this->allowances->allowanceFor($membership, $locked->space_type, $locked->id)?->windowed) {
+                return new WalkInStartResult($session, false);
+            }
+
+            $applies = $this->allowances->coverableSeconds(
+                $membership,
+                $member,
+                $locked,
+                $session->checked_in_at,
+                $session->checked_in_at->copy()->addMinute(),
+            ) > 0;
+
+            return new WalkInStartResult(
+                $session,
+                $applies,
+                $applies ? null : 'api.reception.outside_plan_window',
+            );
+        });
+    }
+
+    /**
+     * The walk-in a guest visit becomes at its grace end
+     * (GuestVisitService::convert()), billed from the guest's arrival. No
+     * admission rule runs: the guest has been inside since then, counted in
+     * the pool all along — refusing them a seat now would change nothing.
+     * A registered guest sits on their own account and plan; anyone else on
+     * their host's, with no plan, no held seat and no hand-over of the
+     * host's: a guest never spends what the host's subscription gives them.
+     * Called inside the caller's transaction, the visit locked.
+     */
+    public function startFromGuestVisit(GuestVisit $visit): WalkinSession
+    {
+        $space = $visit->space;
+        $guest = $visit->guest;
+        $at = $visit->arrived_at;
+
+        if ($guest === null) {
+            return WalkinSession::create([
+                'space_id' => $space->id,
+                'user_id' => $visit->host_user_id,
+                'guest_visit_id' => $visit->id,
+                'membership_id' => null,
+                'seat_covered' => false,
+                'checked_in_at' => $at,
+                'payment_state' => PaymentState::Unpaid,
+                'started_via' => SessionStartSource::Reception,
+                'accepted_uncovered' => false,
+                'coverage_snapshot' => SessionCoverage::notCovered(CoverageReason::NoPlan)->toArray(),
+            ]);
+        }
+
+        return WalkinSession::create([
+            'space_id' => $space->id,
+            'user_id' => $guest->id,
+            'membership_id' => $this->memberships->activeFor($guest)?->id,
+            'seat_covered' => false,
+            'checked_in_at' => $at,
+            'payment_state' => PaymentState::Unpaid,
+            'started_via' => SessionStartSource::Reception,
+            'accepted_uncovered' => false,
+            'coverage_snapshot' => $this->coverage->evaluate($guest, $at)->toArray(),
+            'handover_booking_id' => $this->laterBookingFor($space, $guest)?->id,
+        ]);
+    }
+
+    /**
+     * Whether the branch's co-working pool has a seat for a guest arriving
+     * now on $space — their own subscription's seat when $guest has one, a
+     * free one otherwise. Locks the pool, as every path that seats someone
+     * does; called inside the caller's transaction.
+     */
+    public function assertGuestSeat(Space $space, ?User $guest): void
+    {
+        $space->loadMissing('building');
+        Branch::query()->whereKey($space->building->branch_id)->lockForUpdate()->first();
+
+        $now = now();
+        $end = $now->copy()->addMinute();
+
+        $after = $this->availability->poolTimeline($space, $now, $end, PoolDemand::presence($now, $end, $guest));
+
+        if ($this->availability->exceedsPool($after, $now, $end)) {
+            throw new ReceptionActionException('api.reception.no_capacity');
+        }
+    }
+
+    /**
+     * Whether $member could start a walk-in on $space right now, by the same
+     * rules start() applies — so a kiosk scan can refuse at once rather than
+     * after reception confirms. Nothing is written.
+     */
+    public function assertCanStart(Space $space, User $member): void
+    {
+        DB::transaction(fn () => $this->admit($space, $member));
+    }
+
+    /**
+     * The member's confirmed booking on this coworking space later today,
+     * which this walk-in hands over to at its start — at the desk as after a
+     * scan, or the walk-in would block that booking's check-in and the
+     * booking would be released as a no-show.
+     */
+    private function laterBookingFor(Space $space, User $member): ?Booking
+    {
+        if ($space->space_type !== SpaceType::CoSpace) {
+            return null;
+        }
+
+        $booking = $this->bookings->matchBookingFor($member, $space->building->branch, now(), $space);
+
+        return $booking !== null && $booking->status === BookingStatus::Confirmed && $booking->start_at->isFuture()
+            ? $booking
+            : null;
+    }
+
+    /**
+     * Every rule a walk-in must pass, under the locks start() holds while it
+     * writes. Called inside a transaction.
+     *
+     * @return array{0: Space, 1: bool} the locked space, and whether the walk-in sits in a seat already held
+     */
+    private function admit(Space $space, User $member): array
+    {
+        $space->loadMissing('building');
+
+        // A co_space, or a room lent to co-working right now, seats the
+        // walk-in from its branch's pool — locked before the space, as
+        // every path that touches the pool does
+        // (docs/decisions/coworking-seat-pool.md).
+        $inPool = $this->availability->usesBranchPool($space)
+            || $this->availability->isInCoworkingMode(
+                $this->availability->blockingCoworkingWindows($space, now(), now()->addSecond()),
+                now(),
+                now()->addSecond(),
+            );
+
+        if ($inPool) {
+            Branch::query()->whereKey($space->building->branch_id)->lockForUpdate()->first();
+        }
+
+        $locked = Space::query()->whereKey($space->id)->lockForUpdate()->firstOrFail();
+
+        // A leased office is its tenant's today (docs/decisions/office-leases.md).
+        $timezone = $this->availability->rulesFor($locked)->timezone;
+
+        if ($this->availability->isHeldByLease(
+            $this->availability->blockingLeases($locked->id, now(), now()->addSecond(), $timezone),
+            now(),
+            now()->addSecond(),
+            $timezone,
+        )) {
+            throw new ReceptionActionException('api.booking.office_leased');
+        }
+
+        // At most one open coworking session per member, whichever path
+        // starts it (docs/decisions/coworking-self-service-sessions.md);
+        // the scan refuses a member already in one before it gets here. Rooms
+        // and the other space types are not coworking sessions.
+        if ($locked->space_type === SpaceType::CoSpace && $this->openSessions->for($member) !== null) {
+            throw new ReceptionActionException('api.reception.member_already_in_session', 409);
+        }
+
+        $branch = $locked->building->branch;
+
+        if (! $this->businessHours->isWithinBusinessHours(now(), $branch)) {
+            throw new ReceptionActionException('api.reception.outside_business_hours');
+        }
+
+        $seatCovered = false;
+
+        if ($inPool) {
+            $seatCovered = $this->assertPoolSeat($locked, $member);
+        } elseif ($locked->capacity !== null) {
+            $occupied = Booking::query()
+                ->where('space_id', $locked->id)
+                ->whereNotNull('checked_in_at')
+                ->whereNull('checked_out_at')
+                ->count();
+
+            $occupied += WalkinSession::query()
+                ->where('space_id', $locked->id)
+                ->whereNull('checked_out_at')
+                ->count();
+
+            if ($occupied >= $locked->capacity) {
+                throw new ReceptionActionException('api.reception.no_capacity');
+            }
+        }
+
+        return [$locked, $seatCovered];
+    }
+
+    /**
+     * A seat in the branch's co-working pool for someone arriving now.
+     *
+     * A subscriber inside their plan's hours sits in the seat their
+     * subscription holds — so they get in however full the pool is, up to
+     * the seats a company bought. Anyone else needs a free seat.
+     *
+     * @return bool whether the walk-in sat in a seat already held
+     */
+    private function assertPoolSeat(Space $space, User $member): bool
+    {
+        $now = now();
+        $end = $now->copy()->addMinute();
+
+        $before = $this->availability->poolTimeline($space, $now, $end);
+        $after = $this->availability->poolTimeline($space, $now, $end, PoolDemand::presence($now, $end, $member));
+
+        if ($this->availability->exceedsPool($after, $now, $end)) {
+            throw new ReceptionActionException('api.reception.no_capacity');
+        }
+
+        // Nothing more is taken than before they came: the seat was theirs.
+        return $after->usageAt($now) === $before->usageAt($now);
+    }
+}

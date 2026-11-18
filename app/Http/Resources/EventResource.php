@@ -1,0 +1,113 @@
+<?php
+
+namespace App\Http\Resources;
+
+use App\Domain\Experience\Services\EventLocationService;
+use App\Domain\Finance\Services\CurrencyResolver;
+use App\Support\Presenters\EventDatePresenter;
+use App\Support\Presenters\EventPricePresenter;
+use App\Support\Time\LocalTime;
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+class EventResource extends JsonResource
+{
+    /**
+     * @return array<string, mixed>
+     */
+    public function toArray(Request $request): array
+    {
+        $isAdmin = $request->is('api/v1/admin/*');
+        $header = strtolower((string) ($request->header('lang') ?: $request->header('Accept-Language')));
+        $locale = str_contains($header, 'en') ? 'en' : (str_contains($header, 'ar') ? 'ar' : app()->getLocale());
+
+        $user = null;
+        try {
+            $user = $request->user('sanctum');
+        } catch (\Throwable) {
+        }
+
+        // Points are the stored price; every currency figure is derived at
+        // read time (point system Invariant 1). The presenter also returns
+        // display-ready labels so clients need not re-format them.
+        $time = app(LocalTime::class);
+        $localStart = $time->toLocal($this->start_at);
+        $localEnd = $time->toLocal($this->end_at);
+
+        $targetCurrency = app(CurrencyResolver::class)->resolve($request, $user);
+        $price = app(EventPricePresenter::class)->present($this->resource, $targetCurrency, $locale);
+
+        $datePresenter = app(EventDatePresenter::class);
+        $sessions = $this->relationLoaded('sessions') ? $this->sessions : null;
+        $scheduleAnalysis = $datePresenter->analyzeSchedule($sessions ?? [], $localStart, $localEnd);
+
+        return [
+            'id' => $this->id,
+            'branch_id' => $this->branch_id,
+            'space_id' => $this->space_id,
+            'category_id' => $this->category_id,
+            'title' => $isAdmin ? $this->title : $this->translate('title', $locale),
+            'description' => $isAdmin ? $this->description : $this->translate('description', $locale),
+            'category' => $this->category ? ($isAdmin ? new EventCategoryResource($this->category) : [
+                'id' => $this->category->id,
+                'name' => $this->category->translate('name', $locale),
+            ]) : null,
+            // The admin editor gets a true instant with its offset, so a
+            // round-trip through the form cannot shift the time. Everyone
+            // else gets the local calendar day, which is the day people
+            // would name if you asked them when the event is.
+            'start_at' => $isAdmin ? $this->start_at?->toISOString() : $localStart?->format('Y-m-d'),
+            'end_at' => $isAdmin ? $this->end_at?->toISOString() : $localEnd?->format('Y-m-d'),
+            'start_time' => $localStart?->format('H:i'),
+            'end_time' => $localEnd?->format('H:i'),
+            'timezone' => $time->timezone(),
+            // Structured date/time objects returned to all clients (both member and admin).
+            // Keys: `date` (month, day, weekday, formatted, end_*) and
+            //       `time` (start, end, range).
+            ...$datePresenter->present($localStart, $localEnd),
+            'is_same_time' => $scheduleAnalysis['is_same_time'],
+            'is_continuous' => $scheduleAnalysis['is_continuous'],
+            'schedule' => $scheduleAnalysis['schedule'],
+            // The schedule, when the event runs over more than one sitting.
+            // start_at/end_at above stay the envelope around these, so a
+            // client that only knows about those keeps working.
+            'sessions' => $this->whenLoaded('sessions', fn () => $this->sessions->map(function ($session) use ($isAdmin, $locale, $time, $datePresenter) {
+                $sLocalStart = $time->toLocal($session->start_at);
+                $sLocalEnd = $time->toLocal($session->end_at);
+
+                return [
+                    'id' => $session->id,
+                    'title' => $isAdmin ? $session->title : $session->translate('title', $locale),
+                    'start_at' => $isAdmin ? $session->start_at?->toISOString() : $sLocalStart?->format('Y-m-d'),
+                    'end_at' => $isAdmin ? $session->end_at?->toISOString() : $sLocalEnd?->format('Y-m-d'),
+                    'start_time' => $sLocalStart?->format('H:i'),
+                    'end_time' => $sLocalEnd?->format('H:i'),
+                    // Per-session structured date/time for all clients.
+                    ...$datePresenter->present($sLocalStart, $sLocalEnd),
+                ];
+            })->all()),
+            'location' => app(EventLocationService::class)->displayLocation($this->resource, $locale),
+            // The editor sees what was set — null means "from publication" /
+            // "until the start" — while everyone else sees the effective
+            // window, the close already defaulted to the start.
+            'registration_opens_at' => $isAdmin
+                ? $this->registration_opens_at?->toISOString()
+                : $time->toLocal($this->registration_opens_at)?->toIso8601String(),
+            'registration_closes_at' => $isAdmin
+                ? $this->registration_closes_at?->toISOString()
+                : $time->toLocal($this->registrationClosesAt())?->toIso8601String(),
+            'capacity' => $this->capacity,
+            'is_marked_full' => (bool) $this->is_marked_full,
+            'requires_approval' => (bool) $this->requires_approval,
+            'has_registration_form' => (bool) $this->has_registration_form,
+            'external_form_url' => $this->external_form_url,
+            'is_free' => (bool) ($this->is_free ?? true),
+            ...$price,
+            'display_currency' => $targetCurrency,
+            'image_url' => $this->image_url,
+            'status' => $this->status,
+            'order' => $this->order,
+            'created_at' => $this->created_at?->toISOString(),
+        ];
+    }
+}

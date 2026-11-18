@@ -1,0 +1,949 @@
+<?php
+
+namespace App\Domain\Experience\Services;
+
+use App\Domain\Experience\Models\Event;
+use App\Domain\Experience\Models\EventCategory;
+use App\Domain\Identity\Models\User;
+use App\Http\Resources\Forms\FormFieldResource;
+use App\Support\Enums\EventRegistrationStatus;
+use App\Support\Presenters\AppliedDiscountPresenter;
+use App\Support\Presenters\EventDatePresenter;
+use App\Support\Presenters\EventPricePresenter;
+use App\Support\Presenters\EventSalePresenter;
+use App\Support\Presenters\PaymentStatePresenter;
+use App\Support\Time\LocalTime;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+
+class EventBrowseService
+{
+    /**
+     * When registration closes, in SQL: the admin's close, or the start.
+     * The query-side twin of Event::registrationClosesAt(), so the
+     * open/full/closed filters agree with the status on each card.
+     */
+    private const REGISTRATION_CLOSES_AT = 'COALESCE(events.registration_closes_at, events.start_at)';
+
+    /** One per service, so a listing reads the active offers once. */
+    private ?EventSalePresenter $sales = null;
+
+    /**
+     * Resolve current locale from request header or app locale.
+     */
+    protected function resolveLocale(): string
+    {
+        $request = request();
+        if ($request) {
+            $raw = $request->header('lang') ?: $request->header('Accept-Language');
+            if ($raw) {
+                $header = strtolower(trim((string) $raw));
+                if (str_contains($header, 'en')) {
+                    return 'en';
+                }
+                if (str_contains($header, 'ar')) {
+                    return 'ar';
+                }
+            }
+        }
+
+        return app()->getLocale() ?: 'ar';
+    }
+
+    /**
+     * Browse events for the member app / user with filters:
+     * - free: filter free / paid events
+     * - cancelled: filter cancelled events
+     * - search: search event title/name
+     * - category: filter by category id or slug
+     *
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    public function browse(array $filters = [], ?User $user = null): array
+    {
+        $query = Event::query()
+            ->with(['branch', 'category', 'space.building.branch', 'sessions'])
+            ->withCount('seatHoldingAttendees as attendees_count');
+
+        // 1. Cancelled / Status filter
+        $this->applyStatusFilter($query, $filters);
+
+        // 2. Search by event title/description in text (supports 'search' and 'q')
+        $searchTerm = $filters['search'] ?? $filters['q'] ?? null;
+        if (! empty($searchTerm)) {
+            $search = '%'.trim((string) $searchTerm).'%';
+            $query->where(function (Builder $q) use ($search) {
+                $q->where('title->ar', 'like', $search)
+                    ->orWhere('title->en', 'like', $search)
+                    ->orWhere('description->ar', 'like', $search)
+                    ->orWhere('description->en', 'like', $search);
+            });
+        }
+
+        // 3. Category filter (by id, slug, or generic category param)
+        $categoryId = $filters['category_id'] ?? null;
+        $categorySlug = $filters['category_slug'] ?? null;
+        $category = $filters['category'] ?? null;
+
+        if (! empty($categoryId)) {
+            $query->where('category_id', (int) $categoryId);
+        } elseif (! empty($categorySlug)) {
+            $query->whereHas('category', function (Builder $q) use ($categorySlug) {
+                $q->where('slug', $categorySlug);
+            });
+        } elseif (! empty($category)) {
+            if (is_numeric($category)) {
+                $query->where('category_id', (int) $category);
+            } else {
+                $query->whereHas('category', function (Builder $q) use ($category) {
+                    $q->where('slug', $category);
+                });
+            }
+        }
+
+        // 4. Free / Paid filter
+        $isFree = null;
+        if (array_key_exists('free', $filters)) {
+            $isFree = filter_var($filters['free'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        } elseif (array_key_exists('is_free', $filters)) {
+            $isFree = filter_var($filters['is_free'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        } elseif (! empty($filters['price_type'])) {
+            $isFree = $filters['price_type'] === 'free';
+        } elseif (! empty($filters['type'])) {
+            $isFree = $filters['type'] === 'free';
+        }
+
+        if ($isFree !== null) {
+            $query->where('is_free', $isFree);
+        }
+
+        // Branch filter if provided
+        if (! empty($filters['branch_id'])) {
+            $query->where('branch_id', (int) $filters['branch_id']);
+        }
+
+        // Soonest first, with anything already finished pushed below it.
+        // A plain `order by start_at` would surface a month-old event above
+        // one happening tomorrow, which is never what a calendar wants.
+        // Within the past block the most recent comes first, so the list
+        // reads outward from today in both directions.
+        $query->orderByRaw('CASE WHEN COALESCE(end_at, start_at) >= ? THEN 0 ELSE 1 END asc', [Carbon::now()->toDateTimeString()])
+            ->orderByRaw('CASE WHEN COALESCE(end_at, start_at) >= ? THEN start_at END asc', [Carbon::now()->toDateTimeString()])
+            ->orderBy('start_at', 'desc')
+            ->orderBy('order', 'asc');
+
+        $perPage = isset($filters['per_page']) ? (int) $filters['per_page'] : 20;
+        $paginator = $query->paginate($perPage);
+
+        $events = collect($paginator->items())->map(fn (Event $event) => $this->formatEventCard($event, $user));
+
+        return [
+            'data' => $events,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ];
+    }
+
+    /**
+     * Retrieve full event details for a single event.
+     *
+     * @return array<string, mixed>
+     */
+    public function details(Event|int|string $event, ?User $user = null): array
+    {
+        if (! $event instanceof Event) {
+            $event = Event::with(['branch', 'category', 'sessions'])
+                ->withCount('seatHoldingAttendees as attendees_count')
+                ->find($event);
+
+            if (! $event) {
+                throw new NotFoundHttpException(__('api.system.not_found'));
+            }
+        } else {
+            $event->loadMissing(['branch', 'category', 'sessions']);
+            if (! isset($event->attendees_count)) {
+                $event->loadCount('seatHoldingAttendees as attendees_count');
+            }
+        }
+
+        return $this->formatEventDetails($event, $user);
+    }
+
+    /**
+     * Retrieve events that the authenticated user is registered for ("My Events").
+     * Supports tab filter: 'upcoming' (default) or 'past'.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    public function myEvents(User $user, array $filters = []): array
+    {
+        $now = Carbon::now();
+        $nowStr = $now->toDateTimeString();
+
+        // Base query condition for user's registration
+        $userAttendeeCondition = function ($q) use ($user) {
+            $q->where(function ($sub) use ($user) {
+                $sub->where('user_id', $user->id)
+                    ->orWhere('email', $user->email);
+                if ($user->phone) {
+                    $sub->orWhere('phone', $user->phone);
+                }
+            });
+        };
+
+        // Query for events registered by this user (exclude draft events)
+        $baseQuery = Event::query()
+            ->whereHas('attendees', $userAttendeeCondition)
+            ->where('status', '!=', 'draft');
+
+        // Calculate summary counts across all registered events for the user
+        $upcomingCount = (clone $baseQuery)->where(function (Builder $q) use ($nowStr) {
+            $q->where(function ($sub) use ($nowStr) {
+                $sub->whereNotNull('end_at')->where('end_at', '>=', $nowStr);
+            })->orWhere(function ($sub) use ($nowStr) {
+                $sub->whereNull('end_at')->where('start_at', '>=', $nowStr);
+            });
+        })->count();
+
+        $pastCount = (clone $baseQuery)->where(function (Builder $q) use ($nowStr) {
+            $q->where(function ($sub) use ($nowStr) {
+                $sub->whereNotNull('end_at')->where('end_at', '<', $nowStr);
+            })->orWhere(function ($sub) use ($nowStr) {
+                $sub->whereNull('end_at')->where('start_at', '<', $nowStr);
+            });
+        })->count();
+
+        $totalCount = $upcomingCount + $pastCount;
+
+        // Apply tab filter: 'upcoming' (default), 'past', or 'all'
+        $tab = strtolower(trim((string) ($filters['tab'] ?? $filters['type'] ?? 'upcoming')));
+
+        $query = (clone $baseQuery)
+            ->with([
+                'branch',
+                'category',
+                'space.building.branch',
+                'sessions',
+                'attendees' => $userAttendeeCondition,
+            ])
+            ->withCount('seatHoldingAttendees as attendees_count');
+
+        if ($tab === 'past') {
+            $query->where(function (Builder $q) use ($nowStr) {
+                $q->where(function ($sub) use ($nowStr) {
+                    $sub->whereNotNull('end_at')->where('end_at', '<', $nowStr);
+                })->orWhere(function ($sub) use ($nowStr) {
+                    $sub->whereNull('end_at')->where('start_at', '<', $nowStr);
+                });
+            })->orderBy('start_at', 'desc');
+        } elseif ($tab === 'all') {
+            $query->orderBy('start_at', 'desc');
+        } else {
+            // Default: upcoming
+            $tab = 'upcoming';
+            $query->where(function (Builder $q) use ($nowStr) {
+                $q->where(function ($sub) use ($nowStr) {
+                    $sub->whereNotNull('end_at')->where('end_at', '>=', $nowStr);
+                })->orWhere(function ($sub) use ($nowStr) {
+                    $sub->whereNull('end_at')->where('start_at', '>=', $nowStr);
+                });
+            })->orderBy('start_at', 'asc');
+        }
+
+        $perPage = isset($filters['per_page']) ? (int) $filters['per_page'] : 20;
+        $paginator = $query->paginate($perPage);
+
+        // Every registration's discounts in one query, not one per card.
+        app(AppliedDiscountPresenter::class)->preload(collect($paginator->items())->map(fn (Event $event) => $event->attendees->first())->filter());
+
+        $events = collect($paginator->items())->map(fn (Event $event) => $this->formatMyEventCard($event, $user));
+
+        return [
+            'counts' => [
+                'upcoming' => $upcomingCount,
+                'past' => $pastCount,
+                'total' => $totalCount,
+            ],
+            'data' => $events,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ];
+    }
+
+    /**
+     * Retrieve active event categories for display in the app separately.
+     * Returns id, name (translated by header language), icon, and color (no slug).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function categories(): array
+    {
+        $locale = $this->resolveLocale();
+
+        return EventCategory::query()
+            ->where('is_active', true)
+            ->orderBy('order')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (EventCategory $category) => [
+                'id' => $category->id,
+                'name' => $category->translate('name', $locale),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Correlated count of the seats an event has taken. Placeholders are
+     * bound by the caller from EventRegistrationStatus, so the status list
+     * here can never drift from the enum.
+     */
+    protected function seatCountSubquery(): string
+    {
+        $placeholders = implode(',', array_fill(
+            0,
+            count(EventRegistrationStatus::seatHoldingValues()),
+            '?'
+        ));
+
+        return '(SELECT COUNT(*) FROM event_attendees'
+            .' WHERE event_attendees.event_id = events.id'
+            ." AND event_attendees.status IN ({$placeholders}))";
+    }
+
+    /**
+     * Filter events by dynamic status (open, full, closed, cancelled, all).
+     *
+     * `closed` means registration has closed — at registration_closes_at, or
+     * at the start — not that the event is over; an event under way is
+     * closed. `upcoming` has not opened yet (registration_opens_at ahead).
+     * `open` and `full` are the events taking registrations now.
+     */
+    protected function applyStatusFilter(Builder $query, array $filters): void
+    {
+        $status = $filters['status'] ?? null;
+        $cancelled = $filters['cancelled'] ?? $filters['is_cancelled'] ?? null;
+
+        if ($cancelled !== null) {
+            $isCancelled = filter_var($cancelled, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            if ($isCancelled === true) {
+                $query->where('status', 'cancelled');
+
+                return;
+            } elseif ($isCancelled === false) {
+                $query->where('status', 'published');
+
+                return;
+            }
+        }
+
+        if (empty($status) || $status === 'all') {
+            if ($status !== 'all') {
+                $query->where('status', 'published');
+            }
+
+            return;
+        }
+
+        $statuses = is_array($status) ? $status : explode(',', (string) $status);
+        $statuses = array_map('trim', array_map('strtolower', $statuses));
+
+        $now = Carbon::now()->toDateTimeString();
+
+        $query->where(function (Builder $q) use ($statuses, $now) {
+            foreach ($statuses as $st) {
+                $q->orWhere(function (Builder $sub) use ($st, $now) {
+                    if ($st === 'cancelled') {
+                        $sub->where('status', 'cancelled');
+                    } elseif ($st === 'closed') {
+                        $sub->where('status', 'published')
+                            ->whereRaw(self::REGISTRATION_CLOSES_AT.' <= ?', [$now]);
+                    } elseif ($st === 'upcoming') {
+                        $sub->where('status', 'published')
+                            ->where('registration_opens_at', '>', $now)
+                            ->whereRaw('('.self::REGISTRATION_CLOSES_AT.' IS NULL OR '.self::REGISTRATION_CLOSES_AT.' > ?)', [$now]);
+                    } elseif ($st === 'full') {
+                        $sub->where('status', 'published')
+                            ->whereRaw('('.self::REGISTRATION_CLOSES_AT.' IS NULL OR '.self::REGISTRATION_CLOSES_AT.' > ?)', [$now])
+                            ->where(fn (Builder $o) => $o->whereNull('registration_opens_at')->orWhere('registration_opens_at', '<=', $now))
+                            ->where(function (Builder $capQ) {
+                                $capQ->where('is_marked_full', true)
+                                    ->orWhere(function (Builder $seatQ) {
+                                        $seatQ->whereNotNull('capacity')
+                                            ->whereRaw($this->seatCountSubquery().' >= events.capacity', EventRegistrationStatus::seatHoldingValues());
+                                    });
+                            });
+                    } elseif ($st === 'open') {
+                        $sub->where('status', 'published')
+                            ->whereRaw('('.self::REGISTRATION_CLOSES_AT.' IS NULL OR '.self::REGISTRATION_CLOSES_AT.' > ?)', [$now])
+                            ->where(fn (Builder $o) => $o->whereNull('registration_opens_at')->orWhere('registration_opens_at', '<=', $now))
+                            ->where('is_marked_full', false)
+                            ->where(function (Builder $capQ) {
+                                $capQ->whereNull('capacity')
+                                    ->orWhereRaw($this->seatCountSubquery().' < events.capacity', EventRegistrationStatus::seatHoldingValues());
+                            });
+                    }
+                });
+            }
+        });
+    }
+
+    /**
+     * Retrieve all possible event statuses with localized titles.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function statuses(): array
+    {
+        $locale = $this->resolveLocale();
+
+        return [
+            [
+                'id' => 'open',
+                'slug' => 'open',
+                'name' => $locale === 'en' ? 'Open for Registration' : 'متاح للتسجيل',
+                'color' => '#10B981',
+            ],
+            [
+                'id' => 'upcoming',
+                'slug' => 'upcoming',
+                'name' => $locale === 'en' ? 'Registration Opens Soon' : 'يفتح التسجيل قريباً',
+                'color' => '#3B82F6',
+            ],
+            [
+                'id' => 'full',
+                'slug' => 'full',
+                'name' => $locale === 'en' ? 'Full' : 'مكتمل العدد',
+                'color' => '#F59E0B',
+            ],
+            [
+                'id' => 'closed',
+                'slug' => 'closed',
+                'name' => $locale === 'en' ? 'Registration Closed' : 'التسجيل مغلق',
+                'color' => '#6B7280',
+            ],
+            [
+                'id' => 'cancelled',
+                'slug' => 'cancelled',
+                'name' => $locale === 'en' ? 'Cancelled' : 'ملغى',
+                'color' => '#EF4444',
+            ],
+        ];
+    }
+
+    /**
+     * Formats an event for the list cards with translated fields resolved by header language.
+     *
+     * @return array<string, mixed>
+     */
+
+    /**
+     * This member's own application to an event, rejected ones included.
+     *
+     * A rejection is a decision they are entitled to see — scoping this to
+     * seat-holding rows meant a turned-down member was shown no trace of
+     * their own application. Ordered so a live application wins when someone
+     * has applied again after being turned down.
+     */
+    private function myRegistrationFor(Event $event, ?User $user): ?Model
+    {
+        if ($user === null) {
+            return null;
+        }
+
+        return $event->attendees()
+            ->where(function ($q) use ($user) {
+                $q->where('user_id', $user->id)
+                    ->orWhere('email', $user->email);
+                if ($user->phone) {
+                    $q->orWhere('phone', $user->phone);
+                }
+            })
+            ->orderByRaw("CASE WHEN status = 'rejected' THEN 1 ELSE 0 END asc")
+            ->orderByDesc('id')
+            ->first();
+    }
+
+    public function formatEventCard(Event $event, ?User $user = null): array
+    {
+        $locale = $this->resolveLocale();
+        $start = app(LocalTime::class)->toLocal($event->start_at);
+        $end = app(LocalTime::class)->toLocal($event->end_at);
+        $capacity = $event->capacity !== null ? (int) $event->capacity : null;
+        $attendeesCount = (int) ($event->attendees_count ?? 0);
+
+        $seatsLeft = $capacity !== null ? max(0, $capacity - $attendeesCount) : null;
+        // An admin's "full" stands on its own: it is the only signal an
+        // external event has, since its seats are counted somewhere else.
+        $isFull = (bool) $event->is_marked_full || ($capacity !== null && $seatsLeft === 0);
+        $isCancelled = $event->status === 'cancelled';
+        $now = Carbon::now();
+
+        $registrationState = $this->resolveRegistrationState($event, $isFull, $now);
+
+        // The status follows the registration window, not the event's own
+        // dates: a card used to read "open for registration" for an event
+        // already under way, beside a can_register of false. "closed" is
+        // from registration_closes_at (or the start), "upcoming" until
+        // registration_opens_at — the same moments applyStatusFilter() uses.
+        $window = $event->registrationWindow($now);
+        $computedStatus = 'open';
+        if ($isCancelled) {
+            $computedStatus = 'cancelled';
+        } elseif ($window === 'closed') {
+            $computedStatus = 'closed';
+        } elseif ($window === 'not_yet_open') {
+            $computedStatus = 'upcoming';
+        } elseif ($isFull) {
+            $computedStatus = 'full';
+        }
+
+        $seatsLeftText = $this->resolveSeatsLeftText($capacity, $attendeesCount, $seatsLeft, $isCancelled, $isFull, $locale);
+
+        // One lookup, not two: the row itself answers both "is this member
+        // in" and "where does their registration stand". Rejected rows are
+        // excluded, so a rejected member may register again.
+        $myRegistration = $this->myRegistrationFor($event, $user);
+        $rawRegistrationStatus = $myRegistration?->status?->value;
+        $isRegistered = $myRegistration !== null && $rawRegistrationStatus !== 'rejected';
+        $registrationStatus = $isRegistered
+            ? $this->translateRegistrationStatus($rawRegistrationStatus, $locale)
+            : null;
+
+        // Member-facing: points and price as numbers beside the currency
+        // symbol, no labels — registration debits the wallet and checks the
+        // balance server-side, so a client has nothing to compute.
+        $price = app(EventPricePresenter::class)->presentForDisplay($event, $user, $locale);
+
+        // The hours a card can honestly state are one sitting's, not the
+        // envelope's. Taking the first day's start with the last day's end
+        // produced a range the event is open for on no day at all.
+        $sessions = $event->relationLoaded('sessions') ? $event->sessions : $event->sessions()->get();
+        $sessionCount = $sessions->count();
+        $isMultiDay = $sessionCount > 1;
+
+        $firstSitting = $sessions->first();
+        $sittingStart = $firstSitting ? app(LocalTime::class)->toLocal($firstSitting->start_at) : $start;
+        $sittingEnd = $firstSitting ? app(LocalTime::class)->toLocal($firstSitting->end_at) : $end;
+
+        $scheduleAnalysis = app(EventDatePresenter::class)->analyzeSchedule($sessions, $start, $end);
+        $isMember = request()?->is('*member*');
+
+        $card = [
+            'id' => $event->id,
+            'title' => $event->translate('title', $locale),
+            'description' => $event->translate('description', $locale),
+            'category' => $event->category ? [
+                'id' => $event->category->id,
+                'name' => $event->category->translate('name', $locale),
+            ] : null,
+            'is_multi_day' => $isMultiDay,
+            'session_count' => $sessionCount,
+            'is_same_time' => $scheduleAnalysis['is_same_time'],
+            'is_continuous' => $scheduleAnalysis['is_continuous'],
+            'schedule' => $scheduleAnalysis['schedule'],
+            'location' => app(EventLocationService::class)->displayLocation($event, $locale),
+            'image_url' => $event->image_url,
+            'seats_left_text' => $seatsLeftText,
+            'is_free' => (bool) ($event->is_free ?? true),
+            'pricing' => $price,
+            // The best offer live now for this member: what registering now
+            // would cost. Nothing once they are in — their price is locked.
+            'sale' => $isRegistered ? null : ($this->sales ??= app(EventSalePresenter::class))->for($event, $user, $locale),
+            'status' => $computedStatus,
+            'is_registered' => $isRegistered,
+            // On a card, only a live application: a rejection against every
+            // browsed event is noise the listing cannot explain. The detail
+            // view carries the decision and its reason.
+            'registration_status' => $isRegistered ? $registrationStatus : null,
+            'requires_approval' => (bool) $event->requires_approval,
+            'has_registration_form' => (bool) $event->has_registration_form,
+            // Handed out only while the window is open: a link to a form
+            // that is full or closed invites a registration nobody honours.
+            'external_form_url' => $registrationState === 'open' ? $event->external_form_url : null,
+            'registration_state' => $registrationState,
+            'registration_opens_at' => app(LocalTime::class)->toLocal($event->registration_opens_at)?->toIso8601String(),
+            'registration_closes_at' => app(LocalTime::class)->toLocal($event->registrationClosesAt())?->toIso8601String(),
+            'can_register' => $this->canRegister($event, $registrationState, $isRegistered),
+        ];
+
+        if (! $isMember) {
+            $card['computed_status'] = $computedStatus;
+            $card['start_at'] = $start?->format('Y-m-d');
+            $card['end_at'] = $end?->format('Y-m-d');
+            $card['date'] = [
+                'month' => $start ? strtoupper($start->format('M')) : null,
+                'day' => $start ? $start->format('d') : null,
+                'weekday' => $start ? strtoupper($start->format('D')) : null,
+                'formatted' => $start ? $start->format('F d, Y') : null,
+                'end_month' => $isMultiDay && $end ? strtoupper($end->format('M')) : null,
+                'end_day' => $isMultiDay && $end ? $end->format('d') : null,
+                'end_weekday' => $isMultiDay && $end ? strtoupper($end->format('D')) : null,
+                'end_formatted' => $isMultiDay && $end ? $end->format('F d, Y') : null,
+            ];
+            $card['time'] = [
+                'start' => $sittingStart?->format('h:i A'),
+                'end' => $sittingEnd?->format('h:i A'),
+                'range' => $sittingStart && $sittingEnd
+                    ? ($sittingStart->format('h:i A').' – '.$sittingEnd->format('h:i A'))
+                    : null,
+            ];
+            $card['sessions'] = $sessions->map(function ($session) {
+                $time = app(LocalTime::class);
+                $from = $time->toLocal($session->start_at);
+                $until = $time->toLocal($session->end_at);
+
+                return [
+                    'id' => $session->id,
+                    'title' => $session->translate('title', $this->resolveLocale()),
+                    'date' => $from?->format('Y-m-d'),
+                    'date_formatted' => $from?->format('F d, Y'),
+                    'weekday' => $from ? strtoupper($from->format('D')) : null,
+                    'start_time' => $from?->format('H:i'),
+                    'end_time' => $until?->format('H:i'),
+                    'start_label' => $from?->format('h:i A'),
+                    'end_label' => $until?->format('h:i A'),
+                    'range' => $from && $until ? ($from->format('h:i A').' – '.$until->format('h:i A')) : null,
+                    'ends_next_day' => $from && $until && $until->toDateString() !== $from->toDateString(),
+                ];
+            })->values()->all();
+        }
+
+        return $card;
+    }
+
+    /**
+     * Formats an event for the full single details screen with translated fields resolved by header language.
+     *
+     * @return array<string, mixed>
+     */
+    public function formatEventDetails(Event $event, ?User $user = null): array
+    {
+        $card = $this->formatEventCard($event, $user);
+        $locale = $this->resolveLocale();
+        $start = app(LocalTime::class)->toLocal($event->start_at);
+
+        // price_label already comes from formatEventCard() via the
+        // presenter — no second copy of the formatting here.
+        $time = app(LocalTime::class);
+
+        $mine = $this->myRegistrationFor($event, $user);
+
+        return array_merge($card, [
+            'description' => $event->translate('description', $locale),
+            'date_full' => $start ? $start->format('l, F j, Y') : null,
+            // The decision on this member's own application, which the card
+            // leaves out. A turned-down member was previously shown nothing
+            // at all — no status, no reason, and an invitation to apply
+            // again with no hint of what had happened.
+            'registration_status' => $this->translateRegistrationStatus($mine?->status?->value, $locale),
+            'rejection_reason' => $mine?->rejection_reason,
+            'registered_at' => $mine?->created_at?->toISOString(),
+            'payment' => $this->paymentBlock($mine, $user),
+            'discounts' => $this->discountsFor($mine),
+        ]);
+    }
+
+    /**
+     * Formats an event card specifically for the "My Events" screen.
+     * Matches the mobile design with dual badges, formatted date, ticket id, and action buttons.
+     *
+     * @return array<string, mixed>
+     */
+    public function formatMyEventCard(Event $event, User $user): array
+    {
+        $locale = $this->resolveLocale();
+        $card = $this->formatEventCard($event, $user);
+
+        $attendee = $event->attendees ? $event->attendees->first() : null;
+        $now = Carbon::now();
+        $start = app(LocalTime::class)->toLocal($event->start_at);
+        $end = app(LocalTime::class)->toLocal($event->end_at);
+        $isPast = $end ? $end->isBefore($now) : ($start ? $start->isBefore($now) : false);
+
+        // Where the registration stands. A decision outranks attendance:
+        // only an approved registration can go on to be attended or missed.
+        $isApproved = $attendee?->status === EventRegistrationStatus::Approved;
+
+        if ($attendee?->status === EventRegistrationStatus::AwaitingPayment) {
+            $regStatus = 'awaiting_payment';
+            $regLabel = $locale === 'ar' ? 'بانتظار الدفع' : 'Awaiting payment';
+        } elseif ($attendee?->status === EventRegistrationStatus::Pending) {
+            $regStatus = 'registered';
+            $regLabel = $locale === 'ar' ? 'مسجّل' : 'Registered';
+        } elseif ($attendee?->status === EventRegistrationStatus::Rejected) {
+            $regStatus = 'rejected';
+            $regLabel = $locale === 'ar' ? 'مرفوض' : 'Rejected';
+        } else {
+            $regStatus = 'registered';
+            $regLabel = $locale === 'ar' ? 'مسجّل' : 'Registered';
+
+            if ($isApproved && $attendee?->attended === true) {
+                $regStatus = 'attended';
+                $regLabel = $locale === 'ar' ? 'حضر' : 'Attended';
+            } elseif ($isApproved && $isPast && $attendee?->attended === false) {
+                $regStatus = 'missed';
+                $regLabel = $locale === 'ar' ? 'لم يحضر' : 'Missed';
+            }
+        }
+
+        // Time status badge
+        $timeStatusType = $isPast ? 'past' : 'upcoming';
+        $timeStatusLabel = $isPast
+            ? ($locale === 'ar' ? 'سابق' : 'Past')
+            : ($locale === 'ar' ? 'قادم' : 'Upcoming');
+
+        // Formatted date (e.g. "Thu, Nov 21, 2026 · 6:00 PM")
+        $dateFormatted = null;
+        if ($start) {
+            $hasTime = $start->format('H:i') !== '00:00';
+            $dateFormatted = $start->format('D, M d, Y').($hasTime ? ' · '.$start->format('h:i A') : '');
+        }
+
+        // Badges list for UI
+        $myBadges = [
+            [
+                'type' => $regStatus,
+                'label' => $regLabel,
+                'category' => 'registration',
+            ],
+            [
+                'type' => $timeStatusType,
+                'label' => $timeStatusLabel,
+                'category' => 'time',
+            ],
+        ];
+
+        // Action button
+        $ticketId = $attendee?->id;
+        $action = (! $isPast && $ticketId && $isApproved)
+            ? [
+                'type' => 'view_ticket',
+                'label' => $locale === 'ar' ? 'عرض التذكرة' : 'View Ticket',
+                'ticket_id' => $ticketId,
+            ]
+            : [
+                'type' => 'view_event',
+                'label' => $locale === 'ar' ? 'عرض الفعالية' : 'View Event',
+                'event_id' => $event->id,
+            ];
+
+        return array_merge($card, [
+            'ticket_id' => $ticketId,
+            'date_formatted' => $dateFormatted,
+            'registration' => [
+                'status' => $regStatus,
+                'label' => $regLabel,
+                'attended' => $attendee?->attended,
+                'rejection_reason' => $attendee?->rejection_reason,
+                'registered_at' => $attendee?->created_at?->toISOString(),
+                'payment' => $this->paymentBlock($attendee, $user),
+                'discounts' => $this->discountsFor($attendee),
+            ],
+            'time_status' => [
+                'type' => $timeStatusType,
+                'label' => $timeStatusLabel,
+            ],
+            'my_badges' => $myBadges,
+            'action' => $action,
+        ]);
+    }
+
+    /**
+     * What the registration-form endpoints answer — one way in, and only
+     * what that way needs:
+     *
+     *  - external: the link alone, and null once the event is full or its
+     *    window closed, so nobody is sent to a form that will not be honoured;
+     *  - in-app with questions: the questions;
+     *  - in-app asking nothing: no form key at all — there is nothing to fill.
+     *
+     * @return array<string, mixed>
+     */
+    public function registrationFormPayload(Event $event): array
+    {
+        if ($event->registersExternally()) {
+            return [
+                'external_form_url' => $this->registrationState($event) === 'open' ? $event->external_form_url : null,
+            ];
+        }
+
+        $fields = $event->registrationForm?->activeFields ?? collect();
+
+        if ($fields->isEmpty()) {
+            return ['external_form_url' => null];
+        }
+
+        return [
+            'external_form_url' => null,
+            'registration_form' => FormFieldResource::collection($fields),
+        ];
+    }
+
+    /**
+     * Where registration stands for an event loaded on its own, without the
+     * listing's seat count.
+     */
+    public function registrationState(Event $event): string
+    {
+        $isFull = (bool) $event->is_marked_full
+            || ($event->capacity !== null && $event->seatHoldingAttendees()->count() >= (int) $event->capacity);
+
+        return $this->resolveRegistrationState($event, $isFull, Carbon::now());
+    }
+
+    /**
+     * Whether this member may register now — on our form or on the external
+     * one, which ever the event uses.
+     *
+     * The same values decide it for both kinds: the event is published, the
+     * window is open (after `registration_opens_at`, before
+     * `registration_closes_at`, and never once the event has started), and
+     * it is not full — by seats or by the admin's mark. An in-app event
+     * also refuses a member already holding a seat, who would otherwise see
+     * true and then a 422; a rejected registration holds none, so they may
+     * apply again. An external event's roster lives on its own form, so
+     * there is nothing of ours to check that against.
+     */
+    private function canRegister(Event $event, string $registrationState, bool $isRegistered): bool
+    {
+        if ($event->status !== 'published' || $registrationState !== 'open') {
+            return false;
+        }
+
+        return $event->registersExternally() || ! $isRegistered;
+    }
+
+    /**
+     * `closed` / `not_yet_open` / `full` / `open`. A closed window outranks
+     * everything: there is no point telling someone an event they can no
+     * longer join is also full.
+     */
+    private function resolveRegistrationState(Event $event, bool $isFull, Carbon $now): string
+    {
+        $window = $event->registrationWindow($now);
+
+        return match (true) {
+            $event->status === 'cancelled', $window === 'closed' => 'closed',
+            $window === 'not_yet_open' => 'not_yet_open',
+            $isFull => 'full',
+            default => 'open',
+        };
+    }
+
+    /**
+     * @return array{type: string, label: string}
+     */
+    private function resolveBadge(Event $event, bool $isCancelled, bool $isFull, string $locale = 'ar'): array
+    {
+        if ($isCancelled) {
+            return [
+                'type' => 'cancelled',
+                'label' => $locale === 'ar' ? 'ملغى' : 'Cancelled',
+            ];
+        }
+
+        if ($isFull) {
+            return [
+                'type' => 'full',
+                'label' => $locale === 'ar' ? 'ممتلئ' : 'Full',
+            ];
+        }
+
+        if (! $event->is_free && (int) ($event->price_points ?? 0) > 0) {
+            return [
+                'type' => 'paid',
+                'label' => __('api.event.price_points', ['points' => (int) $event->price_points], $locale),
+            ];
+        }
+
+        return [
+            'type' => 'free',
+            'label' => $locale === 'ar' ? 'مجاني' : 'Free',
+        ];
+    }
+
+    private function resolveSeatsLeftText(?int $capacity, int $attendeesCount, ?int $seatsLeft, bool $isCancelled, bool $isFull, string $locale = 'ar'): string
+    {
+        if ($isCancelled) {
+            return $locale === 'ar' ? 'ملغى' : 'Cancelled';
+        }
+
+        if ($capacity === null) {
+            return $locale === 'ar' ? 'سعة مفتوحة' : 'Open capacity';
+        }
+
+        if ($isFull) {
+            return $locale === 'ar'
+                ? ('ممتلئ • '.$capacity.'/'.$capacity.' مقعد')
+                : ('Full • '.$capacity.'/'.$capacity.' seats');
+        }
+
+        return $locale === 'ar'
+            ? ($seatsLeft.' مقاعد متبقية')
+            : ($seatsLeft.' seats left');
+    }
+
+    /**
+     * This member's registration's `payment` block, in the one shape every
+     * payable shows the member (PaymentStatePresenter, spec section 6):
+     * {state, method, amount_points, price, price_point, paid_at,
+     * payment_id}. `state` is paid, unpaid, pending (a card payment in
+     * flight, `payment_id` the one to poll) or null when there is nothing to
+     * pay (a free event). Null when there is no registration.
+     *
+     * @return array{state: string|null, method: string|null, amount_points: int|null, price: string|null, price_point: string|null, paid_at: string|null, payment_id: int|null}|null
+     */
+    private function paymentBlock(?Model $attendee, ?User $user): ?array
+    {
+        return $attendee === null ? null : app(PaymentStatePresenter::class)->for($attendee, $user);
+    }
+
+    /**
+     * What was taken off this member's registration — offer, coupon — as it
+     * was when the price was locked (AppliedDiscountPresenter). Empty when
+     * there is no registration.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function discountsFor(?Model $attendee): array
+    {
+        return $attendee === null ? [] : app(AppliedDiscountPresenter::class)->for($attendee);
+    }
+
+    /**
+     * Translate registration status according to locale.
+     */
+    public function translateRegistrationStatus(?string $status, string $locale): ?string
+    {
+        if ($status === null) {
+            return null;
+        }
+
+        if ($status === 'awaiting_payment') {
+            return $locale === 'ar' ? 'بانتظار الدفع' : 'Awaiting payment';
+        }
+
+        if ($status === 'rejected') {
+            return $locale === 'ar' ? 'مرفوض' : 'Rejected';
+        }
+
+        if (in_array($status, ['registered', 'approved', 'pending'], true)) {
+            return $locale === 'ar' ? 'مسجّل' : 'Registered';
+        }
+
+        return $status;
+    }
+}

@@ -1,0 +1,260 @@
+<?php
+
+use App\Http\Controllers\Api\V1\Member\AccountController;
+use App\Http\Controllers\Api\V1\Member\BookingController;
+use App\Http\Controllers\Api\V1\Member\BookingDoorController;
+use App\Http\Controllers\Api\V1\Member\CompanyMemberController;
+use App\Http\Controllers\Api\V1\Member\CompanyOfficeLeaseController;
+use App\Http\Controllers\Api\V1\Member\CompanyWalletAllocationController;
+use App\Http\Controllers\Api\V1\Member\CouponPreviewController;
+use App\Http\Controllers\Api\V1\Member\CoworkingSessionController;
+use App\Http\Controllers\Api\V1\Member\EventController;
+use App\Http\Controllers\Api\V1\Member\GuestVisitController;
+use App\Http\Controllers\Api\V1\Member\KitchenController;
+use App\Http\Controllers\Api\V1\Member\MemberCouponController;
+use App\Http\Controllers\Api\V1\Member\MemberDeviceTokenController;
+use App\Http\Controllers\Api\V1\Member\MemberNotificationController;
+use App\Http\Controllers\Api\V1\Member\MemberServiceController;
+use App\Http\Controllers\Api\V1\Member\MemberServiceRequestController;
+use App\Http\Controllers\Api\V1\Member\MembershipController;
+use App\Http\Controllers\Api\V1\Member\PaymentController;
+use App\Http\Controllers\Api\V1\Member\PaymentMethodsController;
+use App\Http\Controllers\Api\V1\Member\PreferencesController;
+use App\Http\Controllers\Api\V1\Member\PrivacyPolicyController;
+use App\Http\Controllers\Api\V1\Member\ProfileController;
+use App\Http\Controllers\Api\V1\Member\PublicDirectoryConsentController;
+use App\Http\Controllers\Api\V1\Member\ScanController;
+use App\Http\Controllers\Api\V1\Member\SpaceAvailabilityController;
+use App\Http\Controllers\Api\V1\Member\TopUpController;
+use App\Http\Controllers\Api\V1\Member\WalletController;
+use Illuminate\Support\Facades\Route;
+
+// Every route in this file already sits behind auth:sanctum + role:member —
+// applied once, from the group wrapping this file in routes/api.php. A
+// company member is still just a `member` role-wise (D.8), so this group
+// covers both individual and company-affiliated members with no split.
+// The reads a visitor may make too (home, spaces, packages, events) are in
+// member-visitor.php.
+
+// The member's own (personal) wallet: balances per category, the history
+// newest first, and one row as a receipt with the balance either side of
+// it. Topping it up is POST wallet/top-ups, by a prepaid method only (the
+// methods and the minimum from GET payment-methods?purpose=wallet_top_up);
+// cash for points is taken by reception.
+Route::get('wallet', [WalletController::class, 'show']);
+Route::get('wallet/transactions', [WalletController::class, 'transactions']);
+Route::get('wallet/transactions/{transaction}', [WalletController::class, 'transaction'])->whereNumber('transaction');
+Route::post('wallet/top-ups', [TopUpController::class, 'store']);
+
+// docs/decisions/wallet-points-categorization.md ("Routing for a user with
+// both a personal wallet and a company membership") — the read side of the
+// hybrid-routing choice: every currently-spendable wallet for a category,
+// clearly labeled by source. No spend happens here.
+//
+// Deprecated for the app: GET member/payment-methods (below)
+// returns the same wallets with their balances inside the `wallet` method.
+// Kept for the app version that still calls it.
+Route::get('wallet/options', [WalletController::class, 'options']);
+
+// docs/decisions/booking-availability-and-calendar.md — the read side of
+// the booking rules: which of the space's cells are free on a day. Read-only
+// and advisory; it holds no slot, so POST bookings still re-checks under a
+// row lock, through the same AvailabilityService. There is no member month
+// calendar — the app builds it from the space details' setup — and no member
+// quote: the member picks a start and an end cell rather than a length from
+// a ladder (the desk keeps its quote in admin.php).
+Route::get('spaces/{space}/availability/slots', [SpaceAvailabilityController::class, 'day']);
+
+// docs/decisions/booking-creation-approval-extension.md — member-facing
+// booking creation with slot granularity/buffer/approval rules.
+Route::post('bookings', [BookingController::class, 'store']);
+Route::post('bookings/{booking}/extend', [BookingController::class, 'extend']);
+// What a closed booking still owes, paid from the app — by the method it was
+// booked with unless the member names another (its home card's button).
+Route::post('bookings/{booking}/pay', [BookingController::class, 'pay']);
+// How far a running booking can be extended, and at what price
+// (docs/decisions/booking-outcomes-and-extension.md).
+Route::get('bookings/{booking}/extension-options', [BookingController::class, 'extensionOptions']);
+
+// The member's own bookings: the list with its tab counts, one booking's
+// detail with the approval stepper, self-service cancellation (the same
+// BookingCancellationService reception calls), and the confirmation
+// screen's price breakdown and payment options, which creates nothing.
+// Static segments before the wildcard so `preview` is not swallowed by
+// `{booking}`.
+Route::get('bookings', [BookingController::class, 'index']);
+// The statuses and tabs the app draws badges and filters from
+// (docs/decisions/booking-outcomes-and-extension.md).
+Route::get('bookings/statuses', [BookingController::class, 'statuses']);
+Route::post('bookings/preview', [BookingController::class, 'preview']);
+// The multi-select date strip: several windows, one request, all or
+// nothing. Partial success would leave the member part-charged for a
+// booking they never got.
+Route::post('bookings/batch', [BookingController::class, 'storeBatch']);
+Route::get('bookings/{booking}', [BookingController::class, 'show']);
+Route::post('bookings/{booking}/cancel', [BookingController::class, 'cancel']);
+// The member leaving a checked-in room, office or hall before its end: it
+// closes now at its full booked price and its door code is revoked
+// (coworking ends through coworking-sessions/current/end-request).
+Route::post('bookings/{booking}/check-out', [BookingController::class, 'checkOut']);
+// The live room card's door buttons: open or lock the booked room's door
+// without its sticker, once the booking is checked in and until it closes.
+Route::post('bookings/{booking}/door/unlock', [BookingDoorController::class, 'unlock'])->middleware('throttle:10,1,member-door');
+Route::post('bookings/{booking}/door/lock', [BookingDoorController::class, 'lock'])->middleware('throttle:10,1,member-door');
+
+// The app's one scan button (ScanController): the kiosk's rotating code
+// starts a coworking session or checks a coworking booking in
+// (docs/decisions/coworking-self-service-sessions.md); a
+// lock's sticker opens that door (docs/decisions/qr-lock-unlock.md §4). The
+// throttle's third argument is a key prefix: without it the scan would share
+// one per-user bucket with every other plainly throttled member route.
+Route::post('scan', [ScanController::class, 'scan'])->middleware('throttle:10,1,member-scan');
+
+// The kitchen (docs/superpowers/specs/2026-11-10-kitchen-orders-design.md):
+// the menu with whether the member may order now, sending an order onto
+// their open coworking session or checked-in booking (paid with it later,
+// once the kitchen accepts), their orders, and taking back a pending one.
+Route::get('kitchen/menu', [KitchenController::class, 'menu']);
+Route::post('kitchen-orders', [KitchenController::class, 'store'])->middleware('throttle:10,1,member-kitchen');
+Route::get('kitchen-orders', [KitchenController::class, 'index']);
+Route::get('kitchen-orders/{order}', [KitchenController::class, 'show'])->whereNumber('order');
+Route::post('kitchen-orders/{order}/cancel', [KitchenController::class, 'cancel'])->whereNumber('order');
+
+// The member's past coworking sessions (walk-ins and checked-in bookings on
+// a coworking space, newest first, `payment_state` to filter) and one
+// session in full — its card, the report and every attempt to pay.
+// The member's coworking guests inside on a visit, and refusing to pay
+// for one with no account while its grace runs (GuestVisitService).
+Route::get('guest-visits', [GuestVisitController::class, 'index']);
+Route::post('guest-visits/{guestVisit}/decline', [GuestVisitController::class, 'decline']);
+
+Route::get('coworking-sessions', [CoworkingSessionController::class, 'index']);
+Route::get('coworking-sessions/{type}/{id}', [CoworkingSessionController::class, 'show'])
+    ->whereIn('type', ['booking', 'walkin'])
+    ->whereNumber('id');
+
+// The running coworking session: the timer, asking to end, the report.
+// Static segments are declared before any {type}/{id} wildcard.
+Route::get('coworking-sessions/current', [CoworkingSessionController::class, 'current']);
+// What ending now would come to and how it can be paid — shown before the
+// member asks to end, so they choose a method knowing the amount.
+Route::get('coworking-sessions/current/checkout', [CoworkingSessionController::class, 'checkout']);
+Route::post('coworking-sessions/current/end-request', [CoworkingSessionController::class, 'requestEnd']);
+Route::delete('coworking-sessions/current/end-request', [CoworkingSessionController::class, 'cancelEnd']);
+Route::get('coworking-sessions/{type}/{id}/report', [CoworkingSessionController::class, 'report'])
+    ->whereIn('type', ['booking', 'walkin'])
+    ->whereNumber('id');
+// A closed session paid from the app (the card chosen when ending it, or
+// another method) — docs/superpowers/specs/2026-10-06-prepayment-all-or-nothing-design.md.
+Route::post('coworking-sessions/{type}/{id}/pay', [CoworkingSessionController::class, 'pay'])
+    ->whereIn('type', ['booking', 'walkin'])
+    ->whereNumber('id');
+
+// Self-service for a company admin managing their own company's members
+// (CompanyPolicy::manageMembers) — checked in the controller, not by role
+// middleware, since it depends on the company_user pivot, not a global role.
+Route::patch('companies/{company}/members/{user}', [CompanyMemberController::class, 'updateDoorAccess']);
+Route::patch('companies/{company}/members/{user}/admin', [CompanyMemberController::class, 'updateAdmin']);
+
+// Same self-service precedent as above, for allocating from the company's
+// wallet (CompanyPolicy::manageMembers) — see
+// docs/decisions/wallet-points-categorization.md.
+Route::post('companies/{company}/wallet-allocations', [CompanyWalletAllocationController::class, 'store']);
+
+// The company admin's view of the company's office leases — dates only, no
+// prices (docs/superpowers/specs/2026-10-10-office-leases-design.md).
+Route::get('companies/{company}/office-leases', [CompanyOfficeLeaseController::class, 'index']);
+
+// A member buys a plan for themselves, or (via an optional company_id in the
+// body, CompanyPolicy::manageMembers) a company admin buys it on behalf of
+// their company — one endpoint, self-service checked in the controller.
+Route::post('memberships', [MembershipController::class, 'store']);
+
+// Every subscription the member holds or held — their own and their
+// companies', active or expired — each saying whose it is (`via`).
+Route::get('memberships', [MembershipController::class, 'index']);
+
+// The member's own active plan and this-cycle usage — "My Subscription" tab.
+Route::get('memberships/current', [MembershipController::class, 'current']);
+
+// Unit 1 design (2026-08-09): both writable by the member at any time.
+// preferred_language becoming writable here is a reversal of prior
+// behavior — see docs/decisions/preferred-language-mutable.md.
+Route::patch('preferences/currency', [PreferencesController::class, 'updateCurrency']);
+Route::patch('preferences/language', [PreferencesController::class, 'updateLanguage']);
+
+// Combined member profile endpoint — account info (UserResource) plus the
+// personal and professional profile domains in one payload, replacing the
+// former split profile/personal + profile/professional routes.
+Route::get('profile', [ProfileController::class, 'show']);
+Route::patch('profile', [ProfileController::class, 'update']);
+
+// Member consent to appear in a future public directory (Task 5 consumes this).
+Route::get('consents/public-directory', [PublicDirectoryConsentController::class, 'show']);
+Route::patch('consents/public-directory', [PublicDirectoryConsentController::class, 'update']);
+
+// Account management
+Route::delete('account', [AccountController::class, 'delete']);
+Route::patch('account/deactivate', [AccountController::class, 'deactivate']);
+Route::patch('account/password', [AccountController::class, 'changePassword']);
+Route::post('profile/image', [AccountController::class, 'updateProfileImage']);
+
+// Privacy Policy consent. Reading the policy, and the terms of use, needs
+// no login: they are in mobile.php, for sign-up to show them.
+Route::post('privacy-policy/consent', [PrivacyPolicyController::class, 'consent']);
+
+// Notifications — in-app notification inbox (database channel).
+Route::get('notifications', [MemberNotificationController::class, 'index']);
+Route::patch('notifications/{id}/read', [MemberNotificationController::class, 'markAsRead']);
+Route::post('notifications/read-all', [MemberNotificationController::class, 'markAllAsRead']);
+Route::get('notifications/unread-count', [MemberNotificationController::class, 'unreadCount']);
+
+// Device token — register/remove the FCM token used for push notifications.
+Route::put('device-token', [MemberDeviceTokenController::class, 'update']);
+Route::delete('device-token', [MemberDeviceTokenController::class, 'destroy']);
+
+// The member's own events and registering. Browsing them (the list,
+// categories, statuses, one event) is in member-visitor.php.
+Route::get('events/my-events', [EventController::class, 'myEvents']);
+Route::get('events/{event}/registration-form', [EventController::class, 'registrationForm']);
+Route::post('events/{event}/register', [EventController::class, 'register']);
+
+// ADD Services — catalog, sections (axes), flat list, and request submission
+Route::get('services', [MemberServiceController::class, 'index']);
+Route::get('services/axes', [MemberServiceController::class, 'axes']);
+Route::get('services/axes/{axis}', [MemberServiceController::class, 'axisServices']);
+Route::get('services/all', [MemberServiceController::class, 'all']);
+Route::get('services/{slug}', [MemberServiceController::class, 'show']);
+// The form and submission endpoints are keyed on the service id, like events' own
+// registration-form, while the catalog reads above stay on the slug.
+Route::get('services/{id}/registration-form', [MemberServiceController::class, 'registrationForm'])->whereNumber('id');
+Route::post('services/{id}/requests', [MemberServiceController::class, 'submitRequest'])->whereNumber('id');
+
+// Member's own service request history
+Route::get('service-requests', [MemberServiceRequestController::class, 'index']);
+Route::get('service-requests/{serviceRequest}', [MemberServiceRequestController::class, 'show']);
+
+// The payment methods the member may use, in config/payments.php order; the
+// wallet method carries the member's points (docs/decisions/unified-payments.md).
+Route::get('payment-methods', [PaymentMethodsController::class, 'index']);
+
+// "Apply" for a coupon code: first whether this member may use it at all,
+// then — given a plan, a booking, a co-working session or an event
+// registration — what it would take off, writing nothing
+// (docs/superpowers/specs/2026-10-04-pricing-offers-coupons-design.md).
+// Throttled, so codes cannot be guessed at speed.
+Route::post('coupons/preview', CouponPreviewController::class)->middleware('throttle:20,1');
+
+// "My coupons": the codes given to this member, by name or through their
+// company, usable now — with `purpose` and a space, plan or event, only
+// those that apply to it. A code given to no one in particular is never listed.
+Route::get('coupons', MemberCouponController::class);
+
+// The member's payments (docs/paymera.md) — reads only. Nothing is paid here:
+// each operation opens its own payment through its own endpoint. `index` is
+// the history; `show` is the status the app polls when its WebView closes —
+// the app never talks to Paymera directly, so the API key stays server side.
+// `show` re-syncs with the gateway on read, which is safe to poll:
+// SyncPaymentStatus locks and refuses to re-process a settled payment.
+Route::get('payments', [PaymentController::class, 'index']);
+Route::get('payments/{payment}', [PaymentController::class, 'show']);

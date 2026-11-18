@@ -1,0 +1,94 @@
+<?php
+
+namespace App\Http\Controllers\Api\V1\Admin\Reception;
+
+use App\Concerns\LogsSensitiveActions;
+use App\Domain\Booking\Exceptions\ReceptionActionException;
+use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Booking\Services\SessionClosureService;
+use App\Domain\Booking\Services\WalkInCapacityService;
+use App\Domain\Finance\Enums\PaymentMethod;
+use App\Domain\Foundation\Models\Space;
+use App\Domain\Identity\Models\User;
+use App\Domain\Kitchen\Models\KitchenOrder;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\Reception\CheckOutSessionRequest;
+use App\Http\Requests\Admin\Reception\SettlePaymentRequest;
+use App\Http\Requests\Admin\Reception\StoreWalkInSessionRequest;
+use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
+
+class WalkInSessionController extends Controller
+{
+    use LogsSensitiveActions;
+
+    public function store(StoreWalkInSessionRequest $request, WalkInCapacityService $capacity): JsonResponse
+    {
+        $space = Space::findOrFail($request->validated('space_id'));
+        $member = User::findOrFail($request->validated('user_id'));
+
+        try {
+            $result = $capacity->start($space, $member);
+        } catch (ReceptionActionException $e) {
+            return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
+        }
+
+        $session = $result->session;
+
+        $this->logSensitiveAction('walkin_session_started', $session);
+
+        $payload = [
+            'data' => [
+                'id' => $session->id,
+                'space_id' => $session->space_id,
+                'user_id' => $session->user_id,
+                'checked_in_at' => $session->checked_in_at->toIso8601String(),
+                // Machine-readable, because `message` alone is ambiguous here:
+                // everywhere else in this API it accompanies a 4xx.
+                'plan_applies' => $result->planApplies,
+            ],
+        ];
+
+        // A caveat on a success, not an error — the session did start. Same
+        // message-beside-data shape as BookingController::storeBatch().
+        if ($result->noticeKey !== null) {
+            $payload['message'] = __($result->noticeKey);
+        }
+
+        return response()->json($payload, 201);
+    }
+
+    public function checkOut(CheckOutSessionRequest $request, WalkinSession $walkinSession, SessionClosureService $closures): JsonResponse
+    {
+        try {
+            $closures->closeOut($walkinSession, Carbon::parse($request->validated('checked_out_at'), 'UTC'));
+        } catch (ReceptionActionException $e) {
+            return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
+        }
+
+        $this->logSensitiveAction('walkin_session_checked_out', $walkinSession, ['amount_owed' => (string) $walkinSession->amount_owed]);
+
+        return response()->json(['message' => __('api.reception.checked_out')]);
+    }
+
+    public function settlePayment(SettlePaymentRequest $request, WalkinSession $walkinSession, SessionClosureService $closures): JsonResponse
+    {
+        $method = PaymentMethod::from($request->validated('payment_method'));
+
+        try {
+            $orders = $closures->settlePayment($walkinSession, $method, $request->user());
+        } catch (ReceptionActionException $e) {
+            return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
+        }
+
+        // The method taken, and the kitchen orders settled with it — each its
+        // own payable beside the bill (kitchen orders spec, decision 11). A
+        // bill already paid that owed only orders has no method of its own.
+        $this->logSensitiveAction('payment_settled', $walkinSession, [
+            'payment_method' => $method->value,
+            'kitchen_orders' => $orders->map(fn (KitchenOrder $order) => ['id' => $order->id, 'points' => (int) $order->total_points])->values()->all(),
+        ]);
+
+        return response()->json(['message' => __('api.reception.payment_settled')]);
+    }
+}

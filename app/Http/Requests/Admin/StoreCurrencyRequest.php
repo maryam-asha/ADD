@@ -1,0 +1,46 @@
+<?php
+
+namespace App\Http\Requests\Admin;
+
+use App\Http\Requests\Concerns\DropsNullDefaults;
+use App\Rules\CashStepFitsDecimals;
+use App\Support\TranslatableField;
+use Illuminate\Foundation\Http\FormRequest;
+
+/**
+ * `is_base` is deliberately not a field here at all — a brand-new currency
+ * starting as base makes no sense; use PATCH currencies/{currency}/base to
+ * reassign the base after creation (docs/decisions/multi-currency-support.md).
+ */
+class StoreCurrencyRequest extends FormRequest
+{
+    use DropsNullDefaults;
+
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $this->dropNullDefaults(['is_active']);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function rules(): array
+    {
+        return array_merge(
+            TranslatableField::rules('name'),
+            [
+                'code' => ['required', 'string', 'size:3', 'regex:/^[A-Z]{3}$/', 'unique:currencies,code'],
+                'symbol' => ['nullable', 'string', 'max:10'],
+                'decimal_places' => ['required', 'integer', 'min:0', 'max:6'],
+                'cash_step' => ['sometimes', 'numeric', 'gt:0', 'decimal:0,2', new CashStepFitsDecimals($this->input('decimal_places'))],
+                'is_active' => ['nullable', 'boolean'],
+                'order' => ['nullable', 'integer', 'min:0'],
+            ]
+        );
+    }
+}

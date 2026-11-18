@@ -1,0 +1,79 @@
+<?php
+
+namespace App\Domain\Identity\Models;
+
+use App\Domain\Foundation\Models\Branch;
+use App\Domain\Identity\Enums\CompanyStatus;
+use App\Domain\Leasing\Models\OfficeLease;
+use App\Domain\Providers\Models\CompanyInvitation;
+use App\Domain\Providers\Models\Provider;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+/**
+ * Created exclusively by operations after a contract is signed (PRD §5.1) —
+ * never self-service. See CompanyController::store, which is the only path
+ * that creates a row here.
+ */
+class Company extends Model
+{
+    use HasFactory;
+
+    protected $fillable = [
+        'legal_name',
+        'contract_ref',
+        'branch_id',
+        'status',
+        'created_from_request_id',
+        'provider_id',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'status' => CompanyStatus::class,
+        ];
+    }
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
+    }
+
+    public function createdFromRequest(): BelongsTo
+    {
+        return $this->belongsTo(PrivateOfficeRequest::class, 'created_from_request_id');
+    }
+
+    public function memberships(): HasMany
+    {
+        return $this->hasMany(CompanyUser::class);
+    }
+
+    public function members(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'company_user')
+            ->using(CompanyUser::class)
+            ->withPivot('id', 'door_access_enabled', 'is_admin')
+            ->withTimestamps();
+    }
+
+    /** The provider managing this company; null when ADD deals with it directly. */
+    public function provider(): BelongsTo
+    {
+        return $this->belongsTo(Provider::class);
+    }
+
+    public function invitations(): HasMany
+    {
+        return $this->hasMany(CompanyInvitation::class);
+    }
+
+    public function officeLeases(): HasMany
+    {
+        return $this->hasMany(OfficeLease::class);
+    }
+}

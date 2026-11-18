@@ -1,0 +1,266 @@
+{
+    "endpoint": "GET /api/v1/member/bookings/statuses",
+    "headers": {
+        "Authorization": "Bearer {member_token}",
+        "lang": "ar | en"
+    },
+    "note": "The endpoint returns labels in the requested language only; both are listed here for reference. Fetch once and cache.",
+    "statuses": [
+        {
+            "key": "pending",
+            "label": {
+                "ar": "قيد المراجعة",
+                "en": "Under Review"
+            },
+            "final": false,
+            "meaning": "Waiting for staff approval. Becomes rejected automatically if still pending when the booking starts (points refunded)."
+        },
+        {
+            "key": "confirmed",
+            "label": {
+                "ar": "مؤكد",
+                "en": "Confirmed"
+            },
+            "final": false,
+            "meaning": "Booked. Includes a booking in progress (checked in, not yet checked out)."
+        },
+        {
+            "key": "completed",
+            "label": {
+                "ar": "مكتمل",
+                "en": "Completed"
+            },
+            "final": true,
+            "meaning": "Checked out. May still be unpaid: see status_note."
+        },
+        {
+            "key": "no_show",
+            "label": {
+                "ar": "لم يتم الحضور",
+                "en": "Not Attended"
+            },
+            "final": true,
+            "meaning": "Ended without a check-in. Paid: points are not refunded. Unpaid: nothing is owed."
+        },
+        {
+            "key": "rejected",
+            "label": {
+                "ar": "مرفوض",
+                "en": "Rejected"
+            },
+            "final": true,
+            "meaning": "Rejected by staff, or closed automatically because nobody reviewed it before it started (request_status.rejection_reason explains which)."
+        },
+        {
+            "key": "cancelled",
+            "label": {
+                "ar": "ملغى",
+                "en": "Cancelled"
+            },
+            "final": true,
+            "meaning": "Cancelled before the cancellation deadline. Paid points are refunded."
+        }
+    ],
+    "filtering": {
+        "used_by": "GET /api/v1/member/bookings?status={key}[,{key}…]",
+        "status": "Optional. One status key, or several comma-separated (status=pending,confirmed). Omitted: every booking. An unknown key is a 422. There is no `filter` key any more; one sent is ignored.",
+        "tabs_in_the_design": {
+            "all": "no status",
+            "upcoming": "status=pending,confirmed",
+            "completed": "status=completed"
+        },
+        "order": "Bookings not yet started first, soonest first; then the rest, latest first.",
+        "is_upcoming": "On every card: true until the booking starts. A booking under way is no longer upcoming.",
+        "response": "{data, meta} only — no per-tab counts. meta.total is the total for the statuses asked for; meta.status echoes them ([] for all)."
+    },
+    "status_note": {
+        "field": "status_note (string | null) on the booking detail, GET /member/bookings/{id} (not on the list card)",
+        "rule": "Null unless two bookings with the same status differ in what happened to the money. Show it under the status badge when not null.",
+        "values": [
+            {
+                "status": "no_show",
+                "payment_state": "paid",
+                "text": {
+                    "ar": "النقاط غير مستردة لأن الحجز لم يُلغَ قبل موعده النهائي.",
+                    "en": "The points are not refunded because the booking was not cancelled before its deadline."
+                }
+            },
+            {
+                "status": "no_show",
+                "payment_state": "unpaid",
+                "text": {
+                    "ar": "لا يترتب عليك أي مبلغ.",
+                    "en": "Nothing is owed for this booking."
+                }
+            },
+            {
+                "status": "completed",
+                "payment_state": "unpaid",
+                "text": {
+                    "ar": "يمكنك الدفع من التطبيق أو عند الاستقبال.",
+                    "en": "You can pay from the app or at reception."
+                }
+            },
+            {
+                "status": "cancelled | rejected",
+                "payment_state": "paid",
+                "text": {
+                    "ar": "أُعيدت النقاط إلى محفظتك.",
+                    "en": "Your points were returned to your wallet."
+                }
+            }
+        ]
+    },
+    "booking_card": {
+        "used_by": "each item of GET /api/v1/member/bookings → data[]",
+        "fields": "Exactly what the card draws. The detail (GET /member/bookings/{id}) carries the rest: status_note, the payment block, actions.can_cancel / can_extend.",
+        "pending_payment_badge": "Not a status: show it for status = confirmed with payment_state = unpaid.",
+        "example": {
+            "id": 41,
+            "space": {
+                "title": "Meeting Room A",
+                "main_image": "https://…/spaces/room-a.jpg"
+            },
+            "date_label": "Today, August 17, 2026",
+            "time_label": "01:00 PM - 02:00 PM (1h)",
+            "is_upcoming": true,
+            "status": "confirmed",
+            "status_label": "Confirmed",
+            "payment_state": "unpaid"
+        },
+        "example_ar": {
+            "date_label": "اليوم، 17 أغسطس 2026",
+            "status_label": "مؤكد"
+        }
+    },
+    "booking_detail": {
+        "used_by": "GET /api/v1/member/bookings/{id} → data",
+        "headlines": "The screen titles and messages (\"Your booking request has been submitted!\", \"We're unable to confirm your booking.\") are the app's, chosen from status. The server sends none.",
+        "pending_paid_wording": "A pending booking paid from the wallet IS charged when it is made, and refunded if not approved: say \"your points come back if the request is not approved\", not \"no charge until approval\".",
+        "reference": "The booking number shown as Request ID, e.g. BK-2026-00041 — a yearly series.",
+        "checked_in": "status stays confirmed until checkout: checked_in_at set and checked_out_at null means the booking is under way.",
+        "cancellation": "null when the booking cannot be cancelled. refund_points is exactly what cancelling gives back (0 if unpaid); refund_to is \"Your wallet\" or the company's name.",
+        "example": {
+            "id": 41,
+            "reference": "BK-2026-00041",
+            "status": "pending",
+            "status_label": "Under Review",
+            "status_note": null,
+            "space": {
+                "id": 4,
+                "title": "Event Hall Grande",
+                "main_image": "https://…/spaces/hall.jpg",
+                "branch": "Main Branch",
+                "capacity": 120,
+                "hourly_price": "50,000 SYP / hour"
+            },
+            "seat": null,
+            "date_label": "August 22, 2026",
+            "time_label": "02:00 PM - 06:00 PM (4h)",
+            "total": {
+                "points": 200,
+                "price": "200,000 SYP"
+            },
+            "checked_in_at": null,
+            "checked_out_at": null,
+            "payment_state": "paid",
+            "payment_id": 93,
+            "awaiting_payment": false,
+            "request_status": {
+                "current": "under_review",
+                "steps": [
+                    "…"
+                ],
+                "rejection_reason": null
+            },
+            "actions": {
+                "can_cancel": true,
+                "can_extend": false,
+                "extend_disabled_reason": "You can extend only while you are checked in."
+            },
+            "cancellation": {
+                "deadline_label": "You can cancel this booking until August 22, 2026, 01:00 PM.",
+                "refund_points": 200,
+                "refund_price": "200,000 SYP",
+                "refund_to": "Your wallet"
+            }
+        }
+    },
+    "extension": {
+        "detail_field": "actions.can_extend (bool) on the booking detail; true only while the booking is running, the member is checked in, the space allows it and the next slot is free. actions.extend_disabled_reason says why not.",
+        "options_endpoint": "GET /api/v1/member/bookings/{id}/extension-options",
+        "extend_endpoint": "POST /api/v1/member/bookings/{id}/extend  body: {\"additional_minutes\": <one of options[].minutes>}",
+        "options_response_example": {
+            "can_extend": true,
+            "reason": null,
+            "reason_label": null,
+            "current_end_at": "2026-10-03T14:00:00+03:00",
+            "latest_end_at": "2026-10-03T16:00:00+03:00",
+            "options": [
+                {
+                    "minutes": 60,
+                    "label": "1h",
+                    "end_at": "2026-10-03T15:00:00+03:00",
+                    "end_time": "03:00 PM",
+                    "price_points": 100,
+                    "price": "10 $",
+                    "price_point": "100 نقطة"
+                },
+                {
+                    "minutes": 120,
+                    "label": "2h",
+                    "end_at": "2026-10-03T16:00:00+03:00",
+                    "end_time": "04:00 PM",
+                    "price_points": 200,
+                    "price": "20 $",
+                    "price_point": "200 نقطة"
+                }
+            ]
+        },
+        "reasons": [
+            {
+                "key": "space_disallows",
+                "label": {
+                    "ar": "لا يمكن تمديد الحجوزات في هذه المساحة.",
+                    "en": "Bookings on this space cannot be extended."
+                }
+            },
+            {
+                "key": "not_checked_in",
+                "label": {
+                    "ar": "يمكنك التمديد فقط وأنت مسجّل الدخول.",
+                    "en": "You can extend only while you are checked in."
+                }
+            },
+            {
+                "key": "outside_booking_time",
+                "label": {
+                    "ar": "يمكنك التمديد فقط أثناء وقت حجزك.",
+                    "en": "You can extend only while your booking is running."
+                }
+            },
+            {
+                "key": "next_slot_booked",
+                "label": {
+                    "ar": "الفترة التالية محجوزة، لذا لا يمكن تمديد حجزك.",
+                    "en": "The next time slot is already booked, so your booking cannot be extended."
+                }
+            },
+            {
+                "key": "seat_room_closes",
+                "label": {
+                    "ar": "تتوقف الغرفة التي تجلس فيها عن العمل كمساحة عمل مشتركة عند انتهاء حجزك، ولا يوجد مقعد آخر متاح.",
+                    "en": "The room you are seated in stops serving co-working when your booking ends, and no other seat is free."
+                }
+            },
+            {
+                "key": "branch_closing",
+                "label": {
+                    "ar": "يُغلق الفرع عند انتهاء حجزك، لذا لا يمكن تمديده.",
+                    "en": "The branch closes when your booking ends, so it cannot be extended."
+                }
+            }
+        ],
+        "latest_end_at": "Latest time the member can stay (\"Latest Possible Departure\"). When can_extend is false, options is [] and reason explains why."
+    }
+}
