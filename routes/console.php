@@ -42,6 +42,13 @@ Schedule::command('model:prune', ['--model' => [
 Schedule::command('reception:close-overdue-sessions')->everyFiveMinutes()->withoutOverlapping();
 
 /*
+ * Coworking guests (GuestVisitService): visits end at closing time, hosts
+ * hear their guest's grace is ending, and a visit past its grace becomes a
+ * walk-in billed from the arrival.
+ */
+Schedule::command('guests:run')->everyMinute()->withoutOverlapping();
+
+/*
  * Reception kiosk (docs/decisions/kiosk-display.md) — a pending arrival
  * request older than its configured window is stale, not actionable; sweep
  * it to `expired` so reception's queue doesn't accumulate entries from

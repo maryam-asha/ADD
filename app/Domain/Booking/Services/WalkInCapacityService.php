@@ -8,6 +8,7 @@ use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Enums\SessionStartSource;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\GuestVisit;
 use App\Domain\Booking\Models\Kiosk;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Booking\ValueObjects\PoolDemand;
@@ -16,6 +17,7 @@ use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Foundation\Services\BusinessHoursService;
 use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Enums\CoverageReason;
 use App\Domain\Membership\Services\MembershipResolver;
 use App\Domain\Membership\Services\PlanAllowanceService;
 use App\Domain\Membership\Services\SessionCoverageEvaluator;
@@ -78,6 +80,12 @@ class WalkInCapacityService
                 'handover_booking_id' => $this->laterBookingFor($locked, $member)?->id,
             ]);
 
+            // Someone in a guest's grace who starts their own session is no
+            // longer a guest: the visit ends on it.
+            if ($locked->space_type === SpaceType::CoSpace) {
+                GuestVisit::endOnOwnSession($member, $session);
+            }
+
             // A plan with an access window that isn't open right now does not
             // block the session — it just isn't covering it, which reception
             // needs told. Anyone without such a plan gets no notice at all,
@@ -103,6 +111,72 @@ class WalkInCapacityService
                 $applies ? null : 'api.reception.outside_plan_window',
             );
         });
+    }
+
+    /**
+     * The walk-in a guest visit becomes at its grace end
+     * (GuestVisitService::convert()), billed from the guest's arrival. No
+     * admission rule runs: the guest has been inside since then, counted in
+     * the pool all along — refusing them a seat now would change nothing.
+     * A registered guest sits on their own account and plan; anyone else on
+     * their host's, with no plan, no held seat and no hand-over of the
+     * host's: a guest never spends what the host's subscription gives them.
+     * Called inside the caller's transaction, the visit locked.
+     */
+    public function startFromGuestVisit(GuestVisit $visit): WalkinSession
+    {
+        $space = $visit->space;
+        $guest = $visit->guest;
+        $at = $visit->arrived_at;
+
+        if ($guest === null) {
+            return WalkinSession::create([
+                'space_id' => $space->id,
+                'user_id' => $visit->host_user_id,
+                'guest_visit_id' => $visit->id,
+                'membership_id' => null,
+                'seat_covered' => false,
+                'checked_in_at' => $at,
+                'payment_state' => PaymentState::Unpaid,
+                'started_via' => SessionStartSource::Reception,
+                'accepted_uncovered' => false,
+                'coverage_snapshot' => SessionCoverage::notCovered(CoverageReason::NoPlan)->toArray(),
+            ]);
+        }
+
+        return WalkinSession::create([
+            'space_id' => $space->id,
+            'user_id' => $guest->id,
+            'membership_id' => $this->memberships->activeFor($guest)?->id,
+            'seat_covered' => false,
+            'checked_in_at' => $at,
+            'payment_state' => PaymentState::Unpaid,
+            'started_via' => SessionStartSource::Reception,
+            'accepted_uncovered' => false,
+            'coverage_snapshot' => $this->coverage->evaluate($guest, $at)->toArray(),
+            'handover_booking_id' => $this->laterBookingFor($space, $guest)?->id,
+        ]);
+    }
+
+    /**
+     * Whether the branch's co-working pool has a seat for a guest arriving
+     * now on $space — their own subscription's seat when $guest has one, a
+     * free one otherwise. Locks the pool, as every path that seats someone
+     * does; called inside the caller's transaction.
+     */
+    public function assertGuestSeat(Space $space, ?User $guest): void
+    {
+        $space->loadMissing('building');
+        Branch::query()->whereKey($space->building->branch_id)->lockForUpdate()->first();
+
+        $now = now();
+        $end = $now->copy()->addMinute();
+
+        $after = $this->availability->poolTimeline($space, $now, $end, PoolDemand::presence($now, $end, $guest));
+
+        if ($this->availability->exceedsPool($after, $now, $end)) {
+            throw new ReceptionActionException('api.reception.no_capacity');
+        }
     }
 
     /**

@@ -37,7 +37,7 @@ class ReceptionSessionsController extends Controller
             ->with('space.building.branch', 'space.zone.floor', 'seatSpace.building', 'seatSpace.zone.floor', 'user.personalProfile', 'user.companies', 'pendingEndRequest')->get();
 
         $walkins = WalkinSession::whereNotNull('checked_in_at')->whereNull('checked_out_at')
-            ->with('space.building.branch', 'space.zone.floor', 'user.personalProfile', 'user.companies', 'pendingEndRequest')->get();
+            ->with('space.building.branch', 'space.zone.floor', 'user.personalProfile', 'user.companies', 'pendingEndRequest', 'guestVisit')->get();
 
         $bookings->each(function (Booking $booking) use ($closures, $now): void {
             $booking->type = 'booking';

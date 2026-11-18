@@ -159,13 +159,17 @@ class PriceQuoteService
             ? $this->walkInPlanDiscount($session)
             : null;
 
+        // A guest billed to their host is priced as anyone with no account:
+        // none of the host's own offers or plan benefits.
+        $pricedFor = $session instanceof WalkinSession && $session->isGuestSession() ? null : $session->user;
+
         // Its locked offer; else, with no plan discount either, the best
         // offer over the time actually used — picked now and locked by the
         // closure (QuoteRecorder::reprice).
         $offer = match (true) {
             $offerRow !== null => new OfferPrice($offerRow->coupon, $this->offers->priceSpace($space, $from, $to, CouponTerms::fromLedger($offerRow)), null),
             $planRedemption !== null, $walkInDiscount !== null => null,
-            default => $this->offers->forSpace($space, $from, $to, $session->user, $session instanceof Booking ? PricingPurpose::Booking : PricingPurpose::CoworkingSession, new UsageInFlight),
+            default => $this->offers->forSpace($space, $from, $to, $pricedFor, $session instanceof Booking ? PricingPurpose::Booking : PricingPurpose::CoworkingSession, new UsageInFlight),
         };
 
         return $this->atLockedTerms(
@@ -178,6 +182,10 @@ class PriceQuoteService
 
     private function walkInPlanDiscount(WalkinSession $session): ?PlanDiscount
     {
+        if ($session->isGuestSession()) {
+            return null;
+        }
+
         $membership = $session->membership ?? ($session->user !== null ? $this->memberships->activeFor($session->user) : null);
 
         return $membership === null

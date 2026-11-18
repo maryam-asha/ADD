@@ -544,6 +544,36 @@ return [
 
     // A member's kitchen order, sent through
     // App\Domain\Kitchen\Services\KitchenOrderNotifier.
+    'guest' => [
+        'registered_billable' => [
+            'title' => 'You have a guest',
+            'body' => 'Reception recorded :guest as your guest. If they are still inside at :time, a session starts for them on your account from their arrival. You can decline before then.',
+        ],
+        'registered' => [
+            'title' => 'You have a guest',
+            'body' => 'Reception recorded :guest as your guest. If they are still inside at :time, a session starts on their own account.',
+        ],
+        'grace_ending' => [
+            'title' => 'Your guest\'s free time is ending',
+            'body' => 'The free time for your guest :guest ends at :time; after that their session is billed to your account.',
+        ],
+        'converted_to_host' => [
+            'title' => 'Your guest\'s session started',
+            'body' => 'A session for your guest :guest started on your account in :space, billed from :time.',
+        ],
+        'converted_registered' => [
+            'title' => 'Your guest\'s session started',
+            'body' => 'A session for your guest :guest started on their own account in :space.',
+        ],
+        'converted_to_guest' => [
+            'title' => 'Your session started',
+            'body' => 'Your free guest time is over; your session in :space started, billed from :time.',
+        ],
+        'host_declined' => [
+            'title' => 'Host declined a guest',
+            'body' => ':host declined to pay for their guest :guest. Check the guest out or register them with an account.',
+        ],
+    ],
     'kitchen_order' => [
         'accepted' => [
             'title' => 'The café accepted your order',

@@ -22,7 +22,10 @@ class OpenCoworkingSessionLocator
     {
         $onCoworking = fn ($query) => $query->where('space_type', SpaceType::CoSpace);
 
+        // A guest's session billed to them is not theirs: they may sit in
+        // their own while their guest sits in that one.
         return WalkinSession::query()
+            ->own()
             ->where('user_id', $member->id)
             ->whereNull('checked_out_at')
             ->whereHas('space', $onCoworking)

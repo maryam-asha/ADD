@@ -51,6 +51,12 @@ class SettingSeeder extends Seeder
         $settings->setDefault('booking.max_days_ahead', 0, SettingValueType::Int);
         $settings->setDefault('profile.completion_threshold', 80, SettingValueType::Int);
         $settings->setDefault('guest.host_approval_timeout_seconds', 120, SettingValueType::Int);
+        // A coworking guest's free minutes before their visit bills from the
+        // arrival, how many such graces a phone gets a day, and how many
+        // guests one host may have inside at once (GuestVisitService).
+        $settings->setDefault('guest.grace_minutes', 15, SettingValueType::Int);
+        $settings->setDefault('guest.free_visits_per_day', 1, SettingValueType::Int);
+        $settings->setDefault('guest.max_active_per_host', 3, SettingValueType::Int);
         $settings->setDefault('kiosk.arrival_request_expiry_minutes', 30, SettingValueType::Int);
         $settings->setDefault('kiosk.app_store_url', 'https://apps.example.local/ios', SettingValueType::String);
         $settings->setDefault('kiosk.google_play_url', 'https://apps.example.local/android', SettingValueType::String);

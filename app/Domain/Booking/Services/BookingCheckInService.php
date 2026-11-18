@@ -8,6 +8,7 @@ use App\Domain\Booking\Events\BookingCheckedIn;
 use App\Domain\Booking\Events\BookingStarted;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\GuestVisit;
 use App\Domain\Booking\Models\Kiosk;
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Services\BusinessHoursService;
@@ -100,6 +101,11 @@ class BookingCheckInService
             'checked_in_via' => $via,
             'kiosk_id' => $kiosk?->id,
         ])->save();
+
+        // A guest who checks into their own coworking booking is no longer a guest.
+        if ($booking->space->space_type === SpaceType::CoSpace) {
+            GuestVisit::endOnOwnSession($booking->user);
+        }
 
         // A room has no acceptance step: checked in is started, for the
         // member's card and the desk alike. A coworking booking's start is

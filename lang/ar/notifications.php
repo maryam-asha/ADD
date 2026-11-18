@@ -544,6 +544,36 @@ return [
 
     // A member's kitchen order (Arabic), sent through
     // App\Domain\Kitchen\Services\KitchenOrderNotifier.
+    'guest' => [
+        'registered_billable' => [
+            'title' => 'لديك ضيف',
+            'body' => 'سجّل الاستقبال :guest ضيفاً عندك. إذا بقي في الداخل حتى :time تبدأ له جلسة على حسابك من وقت دخوله، ويمكنك الرفض قبل ذلك.',
+        ],
+        'registered' => [
+            'title' => 'لديك ضيف',
+            'body' => 'سجّل الاستقبال :guest ضيفاً عندك. إذا بقي في الداخل حتى :time تبدأ جلسته على حسابه الخاص.',
+        ],
+        'grace_ending' => [
+            'title' => 'مهلة ضيفك تنتهي قريباً',
+            'body' => 'تنتهي المهلة المجانية لضيفك :guest عند :time، وبعدها تُحتسب جلسته على حسابك.',
+        ],
+        'converted_to_host' => [
+            'title' => 'بدأت جلسة ضيفك',
+            'body' => 'بدأت جلسة لضيفك :guest على حسابك في :space، محتسبة من :time.',
+        ],
+        'converted_registered' => [
+            'title' => 'بدأت جلسة ضيفك',
+            'body' => 'بدأت جلسة لضيفك :guest على حسابه الخاص في :space.',
+        ],
+        'converted_to_guest' => [
+            'title' => 'بدأت جلستك',
+            'body' => 'انتهت مدة الضيافة المجانية، وبدأت جلستك في :space محتسبة من :time.',
+        ],
+        'host_declined' => [
+            'title' => 'مضيف رفض ضيفاً',
+            'body' => 'رفض :host تحمّل تكلفة ضيفه :guest. سجّل خروج الضيف أو سجّله بحساب.',
+        ],
+    ],
     'kitchen_order' => [
         'accepted' => [
             'title' => 'قبل الكافيه طلبك',

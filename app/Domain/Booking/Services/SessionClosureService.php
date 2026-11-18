@@ -12,6 +12,7 @@ use App\Domain\Booking\Events\BookingCheckedOut;
 use App\Domain\Booking\Events\BookingEnded;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\GuestVisit;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Finance\Enums\PaymentPurpose;
@@ -78,6 +79,7 @@ class SessionClosureService
             $locked = $session::query()->whereKey($session->getKey())->lockForUpdate()->firstOrFail();
 
             $this->assertOpenForClosure($locked);
+            $this->assertHostHasNoGuestsInside($locked);
 
             if ($enteredTime->lt($locked->checked_in_at)) {
                 throw new ReceptionActionException('api.reception.checkout_before_checkin');
@@ -233,6 +235,27 @@ class SessionClosureService
         }
 
         return Collection::make($periods)->pluck('close_time')->sort()->last();
+    }
+
+    /**
+     * A host's own coworking session does not close at the desk while a
+     * guest of theirs is still inside — on a visit, or on a session billed
+     * to them: reception checks the guest out first. The closing-time sweep
+     * is not held back by it (GuestVisitService::sweep() ends visits there).
+     */
+    private function assertHostHasNoGuestsInside(Booking|WalkinSession $session): void
+    {
+        if ($session->space->space_type !== SpaceType::CoSpace
+            || ($session instanceof WalkinSession && $session->isGuestSession())) {
+            return;
+        }
+
+        $hasGuests = GuestVisit::query()->active()->where('host_user_id', $session->user_id)->exists()
+            || WalkinSession::query()->open()->where('user_id', $session->user_id)->whereNotNull('guest_visit_id')->exists();
+
+        if ($hasGuests) {
+            throw new ReceptionActionException('api.guest.host_has_guests', 409);
+        }
     }
 
     private function assertOpenForClosure(Booking|WalkinSession $session): void

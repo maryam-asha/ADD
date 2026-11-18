@@ -877,6 +877,21 @@ return [
     ],
 
     // Paying for a kitchen order, its own payable (App\Domain\Kitchen).
+    'guest' => [
+        'host_not_in_session' => 'The host has no active coworking session.',
+        'host_is_guest' => 'A host cannot be their own guest.',
+        'already_in_session' => 'This guest already has an active coworking session of their own.',
+        'name_required' => 'Enter the guest\'s name: this phone has no account.',
+        'already_visiting' => 'This guest is already inside on a visit.',
+        'host_limit' => 'A host may have at most :max guests inside at once.',
+        'host_has_guests' => 'This member still has a guest inside: check the guest out first.',
+        'already_converted' => 'This visit has already become a session: check that session out.',
+        'already_left' => 'This guest has already been checked out.',
+        'not_declinable' => 'This guest can no longer be declined.',
+        'declined' => 'You declined to pay for this guest; reception has been told.',
+        'checked_out' => 'The guest has been checked out at no charge.',
+        'checked_out_billed' => 'The guest has been checked out and their session billed from their arrival.',
+    ],
     'kitchen_order' => [
         'description' => 'Café order #:id',
         'not_payable' => 'This order was rejected or cancelled, so it cannot be paid.',

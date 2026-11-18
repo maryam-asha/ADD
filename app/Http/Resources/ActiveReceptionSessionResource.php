@@ -49,6 +49,11 @@ class ActiveReceptionSessionResource extends JsonResource
                 'avatar_url' => $this->user?->personalProfile?->avatar_url,
                 'company' => $this->user?->companies->first()?->legal_name,
             ],
+            // A guest's session billed to their host: `member` is then the
+            // host who pays, and this the person in the seat.
+            'guest' => $this->resource instanceof WalkinSession && $this->guestVisit !== null
+                ? ['visit_id' => $this->guestVisit->id, 'name' => $this->guestVisit->guest_name, 'phone' => $this->guestVisit->guest_phone]
+                : null,
             'plan' => $this->resource instanceof WalkinSession && $this->coverage_snapshot !== null
                 ? new SessionCoverageResource($this->coverage_snapshot)
                 : null,

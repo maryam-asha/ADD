@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\Member\CompanyWalletAllocationController;
 use App\Http\Controllers\Api\V1\Member\CouponPreviewController;
 use App\Http\Controllers\Api\V1\Member\CoworkingSessionController;
 use App\Http\Controllers\Api\V1\Member\EventController;
+use App\Http\Controllers\Api\V1\Member\GuestVisitController;
 use App\Http\Controllers\Api\V1\Member\KitchenController;
 use App\Http\Controllers\Api\V1\Member\MemberCouponController;
 use App\Http\Controllers\Api\V1\Member\MemberDeviceTokenController;
@@ -122,6 +123,11 @@ Route::post('kitchen-orders/{order}/cancel', [KitchenController::class, 'cancel'
 // The member's past coworking sessions (walk-ins and checked-in bookings on
 // a coworking space, newest first, `payment_state` to filter) and one
 // session in full — its card, the report and every attempt to pay.
+// The member's coworking guests inside on a visit, and refusing to pay
+// for one with no account while its grace runs (GuestVisitService).
+Route::get('guest-visits', [GuestVisitController::class, 'index']);
+Route::post('guest-visits/{guestVisit}/decline', [GuestVisitController::class, 'decline']);
+
 Route::get('coworking-sessions', [CoworkingSessionController::class, 'index']);
 Route::get('coworking-sessions/{type}/{id}', [CoworkingSessionController::class, 'show'])
     ->whereIn('type', ['booking', 'walkin'])

@@ -12,6 +12,7 @@ use App\Domain\Access\Models\AccessGrant;
 use App\Domain\Booking\Enums\ArrivalRequestPurpose;
 use App\Domain\Booking\Enums\ArrivalRequestStatus;
 use App\Domain\Booking\Enums\BookingStatus;
+use App\Domain\Booking\Enums\GuestVisitStatus;
 use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Enums\SessionEndRequestStatus;
@@ -19,6 +20,7 @@ use App\Domain\Booking\Enums\SessionStartSource;
 use App\Domain\Booking\Enums\TerminationSource;
 use App\Domain\Booking\Models\ArrivalRequest;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\GuestVisit;
 use App\Domain\Booking\Models\SessionEndRequest;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Ecosystem\Enums\AnnouncementPlacement;
@@ -163,6 +165,9 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
         ],
         SessionEndRequest::class => [
             'status' => SessionEndRequestStatus::class,
+        ],
+        GuestVisit::class => [
+            'status' => GuestVisitStatus::class,
         ],
         QrPoint::class => [
             'place_type' => QrPointPlace::class,

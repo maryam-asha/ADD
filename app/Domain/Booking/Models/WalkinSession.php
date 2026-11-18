@@ -28,6 +28,7 @@ class WalkinSession extends Model
         'reference',
         'space_id',
         'user_id',
+        'guest_visit_id',
         'membership_id',
         'seat_covered',
         'checked_in_at',
@@ -80,6 +81,26 @@ class WalkinSession extends Model
     }
 
     /** Checked in and not yet out: someone is inside on it now. */
+    /**
+     * The person's own sessions: not a guest's billed to them as host
+     * (`guest_visit_id`), whose user_id is the payer, not who sat there.
+     */
+    public function scopeOwn(Builder $query): Builder
+    {
+        return $query->whereNull('guest_visit_id');
+    }
+
+    /** A guest's session billed to their host (GuestVisitService::convert()). */
+    public function isGuestSession(): bool
+    {
+        return $this->guest_visit_id !== null;
+    }
+
+    public function guestVisit(): BelongsTo
+    {
+        return $this->belongsTo(GuestVisit::class);
+    }
+
     public function scopeOpen(Builder $query): Builder
     {
         return $query->whereNotNull('checked_in_at')->whereNull('checked_out_at');

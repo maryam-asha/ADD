@@ -77,13 +77,13 @@ class MemberProfileController extends Controller
 
         $openBooking = Booking::query()->with('space')->where('user_id', $user->id)
             ->whereNotNull('checked_in_at')->whereNull('checked_out_at')->latest('checked_in_at')->first();
-        $openWalkIn = WalkinSession::query()->with('space')->where('user_id', $user->id)
+        $openWalkIn = WalkinSession::query()->own()->with('space')->where('user_id', $user->id)
             ->whereNotNull('checked_in_at')->whereNull('checked_out_at')->latest('checked_in_at')->first();
         $open = $openWalkIn ?? $openBooking;
 
         $lastVisit = collect([
             Booking::query()->where('user_id', $user->id)->max('checked_in_at'),
-            WalkinSession::query()->where('user_id', $user->id)->max('checked_in_at'),
+            WalkinSession::query()->own()->where('user_id', $user->id)->max('checked_in_at'),
         ])->filter()->map(fn ($at) => CarbonImmutable::parse($at, 'UTC'))->max();
 
         return response()->json(['data' => [

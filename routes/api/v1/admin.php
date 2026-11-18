@@ -70,6 +70,7 @@ use App\Http\Controllers\Api\V1\Admin\Reception\AccessActivationController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ArrivalRequestController as ReceptionArrivalRequestController;
 use App\Http\Controllers\Api\V1\Admin\Reception\BookingReceptionController;
 use App\Http\Controllers\Api\V1\Admin\Reception\CashRegisterSessionController;
+use App\Http\Controllers\Api\V1\Admin\Reception\GuestVisitController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ItemSaleController as ReceptionItemSaleController;
 use App\Http\Controllers\Api\V1\Admin\Reception\KitchenCashReturnController;
 use App\Http\Controllers\Api\V1\Admin\Reception\KitchenOrderReviewController;
@@ -473,6 +474,11 @@ Route::get('reception/bookings/{booking}/access-grant', [AccessActivationControl
 Route::post('reception/bookings/{booking}/access-grant/reissue', [AccessActivationController::class, 'reissue'])->middleware('permission:reception.check_in');
 
 Route::post('reception/walk-ins', [WalkInSessionController::class, 'store'])->middleware('permission:reception.check_in');
+// Coworking guests of a member in a session: free for `guest.grace_minutes`,
+// then a walk-in billed from the arrival (GuestVisitService).
+Route::get('reception/guest-visits', [GuestVisitController::class, 'index'])->middleware('permission:reception.view');
+Route::post('reception/guest-visits', [GuestVisitController::class, 'store'])->middleware('permission:reception.check_in');
+Route::post('reception/guest-visits/{guestVisit}/check-out', [GuestVisitController::class, 'checkOut'])->middleware('permission:reception.check_in');
 Route::post('reception/walk-ins/{walkinSession}/check-out', [WalkInSessionController::class, 'checkOut'])->middleware('permission:reception.check_in');
 Route::post('reception/walk-ins/{walkinSession}/settle-payment', [WalkInSessionController::class, 'settlePayment'])->middleware('permission:reception.settle_payment');
 

@@ -3,6 +3,7 @@
 namespace App\Domain\Booking\Services;
 
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\GuestVisit;
 use App\Domain\Booking\Models\SpaceCoworkingWindow;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Booking\ValueObjects\PoolDemand;
@@ -312,8 +313,9 @@ class CoworkingPoolService
             ->get(['id', 'user_id', 'start_at', 'end_at']);
 
         $walkIns = $this->openWalkIns($coSpaces, $windows, $from, $to);
+        $guests = $this->guestsInGrace($coSpaces, $from, $to);
 
-        $userIds = [...$bookings->pluck('user_id'), ...$walkIns->pluck('user_id')];
+        $userIds = [...$bookings->pluck('user_id'), ...$walkIns->pluck('user_id'), ...$guests->pluck('guest_user_id')->filter()];
 
         if ($candidate?->user !== null) {
             $userIds[] = $candidate->user->id;
@@ -333,10 +335,28 @@ class CoworkingPoolService
                 'start' => $now,
                 'end' => $now->addSecond(),
                 // The membership stamped at check-in, when it holds seats here
-                // and its person has hours left this cycle.
-                'membership' => $held->has($walkIn->membership_id) && ! in_array($walkIn->user_id, $exhausted[$walkIn->membership_id] ?? [], true)
-                    ? $walkIn->membership_id
-                    : ($coveringOf[$walkIn->user_id] ?? null),
+                // and its person has hours left this cycle. A guest billed to
+                // their host takes a free seat, never one the host's holds.
+                'membership' => match (true) {
+                    $walkIn->guest_visit_id !== null => null,
+                    $held->has($walkIn->membership_id) && ! in_array($walkIn->user_id, $exhausted[$walkIn->membership_id] ?? [], true) => $walkIn->membership_id,
+                    default => $coveringOf[$walkIn->user_id] ?? null,
+                },
+            ];
+        }
+
+        // A guest still in their grace is inside too: a seat of their own
+        // subscription when they have one, a free one otherwise. Not twice
+        // for the person the candidate is.
+        foreach ($guests as $visit) {
+            if ($visit->guest_user_id !== null && $visit->guest_user_id === $candidate?->user?->id) {
+                continue;
+            }
+
+            $presences[] = [
+                'start' => $now,
+                'end' => $now->addSecond(),
+                'membership' => $visit->guest_user_id !== null ? ($coveringOf[$visit->guest_user_id] ?? null) : null,
             ];
         }
 
@@ -597,7 +617,28 @@ class CoworkingPoolService
         return WalkinSession::query()
             ->whereNull('checked_out_at')
             ->whereIn('space_id', [...$coSpaces->modelKeys(), ...$lentNow])
-            ->get(['id', 'user_id', 'membership_id']);
+            ->get(['id', 'user_id', 'membership_id', 'guest_visit_id']);
+    }
+
+    /**
+     * Guests inside on a visit, not yet on a session, on the pool's
+     * co_spaces — when now lies in the range, like open walk-ins.
+     *
+     * @param  Collection<int, Space>  $coSpaces
+     * @return \Illuminate\Support\Collection<int, GuestVisit>
+     */
+    private function guestsInGrace(Collection $coSpaces, CarbonImmutable $from, CarbonImmutable $to): \Illuminate\Support\Collection
+    {
+        $now = now();
+
+        if ($now->lessThan($from) || $now->greaterThanOrEqualTo($to)) {
+            return collect();
+        }
+
+        return GuestVisit::query()
+            ->active()
+            ->whereIn('space_id', $coSpaces->modelKeys())
+            ->get(['id', 'guest_user_id']);
     }
 
     private function inBranch(Builder $space, Branch $branch): Builder
