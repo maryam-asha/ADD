@@ -24,6 +24,8 @@ class LeaveTypeResource extends JsonResource
             'is_paid' => $this->is_paid,
             'tracks_balance' => $this->tracks_balance,
             'allows_half_day' => $this->allows_half_day,
+            'min_request' => $this->min_request,
+            'max_request' => $this->max_request,
             'counts_calendar_days' => $this->counts_calendar_days,
             'hide_reason' => $this->hide_reason,
             'requires_attachment' => $this->requiresAttachment(),

@@ -7,8 +7,9 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * An employee in a list. Eager-load `activeAssignment.orgUnit` and
- * `activeAssignment.position` to keep lists to a few queries.
+ * An employee in a list. Eager-load `activeAssignment.orgUnit`,
+ * `activeAssignment.position` and `activeAssignment.manager` to keep lists
+ * to a few queries.
  *
  * @mixin Employee
  */
@@ -30,6 +31,13 @@ class EmployeeSummaryResource extends JsonResource
             'hired_on' => $this->hired_on->toDateString(),
             'job_title' => $assignment?->resolvedTitle(),
             'org_unit' => $assignment?->orgUnit ? ['id' => $assignment->orgUnit->id, 'name' => $assignment->orgUnit->name] : null,
+            'work_email' => $this->work_email,
+            'employment_type' => $assignment?->employment_type?->value,
+            'manager' => $assignment?->manager ? [
+                'id' => $assignment->manager->id,
+                'employee_number' => $assignment->manager->employee_number,
+                'name' => $assignment->manager->name,
+            ] : null,
         ];
     }
 }

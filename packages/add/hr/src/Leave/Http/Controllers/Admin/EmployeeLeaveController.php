@@ -48,13 +48,15 @@ class EmployeeLeaveController extends Controller
         $on = CarbonImmutable::parse($data['effective_on'] ?? LocalDay::today());
 
         $entry = DB::transaction(function () use ($data, $employee, $ledger, $on, $request) {
+            $type = LeaveType::query()->findOrFail($data['leave_type_id']);
             $entry = $ledger->record(
                 $employee,
-                LeaveType::query()->findOrFail($data['leave_type_id']),
+                $type,
                 LedgerKind::from($data['kind']),
                 (float) $data['amount'],
                 $on,
-                (int) ($data['period_year'] ?? $on->year),
+                // Unless named, the cycle the day falls in (the calendar year, or the anniversary year).
+                (int) ($data['period_year'] ?? $ledger->currentPeriodYear($employee, $type, $on)),
                 ['notes' => $data['notes'], 'created_by' => $request->user()?->getAuthIdentifier()],
             );
 

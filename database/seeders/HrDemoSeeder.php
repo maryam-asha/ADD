@@ -32,7 +32,9 @@ use RuntimeException;
  * Everything goes through the package's own services, as the screens do,
  * so the data obeys every rule. Dates are relative to the day it runs.
  * Staff log in to the dashboard with their email and the password
- * `password` (the HR officer: dana.khatib@staff.demo, role hr_manager).
+ * `password` (the HR officer: hr.officer@staff.demo, role hr_manager).
+ * Each address is the staff key with dots for underscores
+ * (SeedsHrPeople), so `hr_officer` signs in as `hr.officer@staff.demo`.
  *
  * Local and staging only; runs once (skipped when any employee exists):
  * `php artisan db:seed --class=HrDemoSeeder`.

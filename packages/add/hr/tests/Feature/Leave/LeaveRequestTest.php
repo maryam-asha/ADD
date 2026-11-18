@@ -355,4 +355,17 @@ class LeaveRequestTest extends TestCase
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.employee.id', $newcomer->id);
     }
+
+    public function test_a_type_bounds_the_length_of_one_request(): void
+    {
+        $this->annual->update(['min_request' => 2, 'max_request' => 3]);
+        $this->actingAsEmployee($this->employee);
+        $quote = fn (string $from, string $to) => $this->postJson('/api/hr/me/leave/quote', ['leave_type_id' => $this->annual->id, 'starts_on' => $from, 'ends_on' => $to]);
+
+        $quote('2026-03-09', '2026-03-09')->assertUnprocessable()->assertJsonPath('message', __('hr::leave.request_too_short', ['amount' => '2', 'unit' => __('hr::leave.unit_day')]));
+        $quote('2026-03-09', '2026-03-12')->assertUnprocessable()->assertJsonPath('message', __('hr::leave.request_too_long', ['amount' => '3', 'unit' => __('hr::leave.unit_day')]));
+        $quote('2026-03-09', '2026-03-11')->assertOk()->assertJsonPath('data.amount', '3');
+
+        $this->submit(['starts_on' => '2026-03-09', 'ends_on' => '2026-03-13'])->assertUnprocessable();
+    }
 }

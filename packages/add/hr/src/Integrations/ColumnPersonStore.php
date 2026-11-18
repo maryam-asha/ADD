@@ -64,6 +64,20 @@ class ColumnPersonStore implements PersonStore
             ->orWhere('work_email', 'like', "%{$term}%"));
     }
 
+    public function orderByName(Builder $query, string $direction): void
+    {
+        $query->orderBy('hr_employees.name->'.self::locale(), $direction);
+    }
+
+    /**
+     * The name language a list is ordered in: the request's, when it is one
+     * a name is kept in.
+     */
+    public static function locale(): string
+    {
+        return app()->getLocale() === 'ar' ? 'ar' : 'en';
+    }
+
     /**
      * @return array<string, mixed>
      */

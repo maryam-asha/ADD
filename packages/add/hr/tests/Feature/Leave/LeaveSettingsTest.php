@@ -159,4 +159,65 @@ class LeaveSettingsTest extends TestCase
             'leave_type_id' => $type->id, 'kind' => 'adjustment', 'amount' => 1, 'effective_on' => '2027-01-01', 'notes' => 'correction',
         ])->assertCreated();
     }
+
+    public function test_a_type_takes_request_limits_and_a_policy_takes_its_rules(): void
+    {
+        $this->actingAsWith([Abilities::SETTINGS_MANAGE, Abilities::LEAVE_VIEW]);
+
+        $this->postJson('/api/hr/leave-types', ['code' => 'study', 'name' => ['ar' => 'دراسية'], 'min_request' => 3, 'max_request' => 2])
+            ->assertUnprocessable()->assertJsonValidationErrors(['max_request']);
+        $type = $this->postJson('/api/hr/leave-types', ['code' => 'study', 'name' => ['ar' => 'دراسية'], 'min_request' => 1, 'max_request' => 10])
+            ->assertCreated()
+            ->assertJsonPath('data.min_request', '1')
+            ->assertJsonPath('data.max_request', '10')
+            ->json('data.id');
+
+        $base = ['leave_type_id' => $type, 'effective_from' => '2026-01-01', 'annual_entitlement' => 21];
+        $this->postJson('/api/hr/leave-policies', [...$base, 'accrual_method' => 'monthly', 'grant_cycle' => 'hire_anniversary'])
+            ->assertUnprocessable()->assertJsonValidationErrors(['grant_cycle']);
+        $this->postJson('/api/hr/leave-policies', [...$base, 'accrual_method' => 'annual_grant', 'carry_over_mode' => 'capped'])
+            ->assertUnprocessable()->assertJsonValidationErrors(['carry_over_max']);
+
+        $this->postJson('/api/hr/leave-policies', [
+            ...$base,
+            'accrual_method' => 'annual_grant',
+            'grant_cycle' => 'hire_anniversary',
+            'tier_timing' => 'on_anniversary',
+            'hire_grant' => 'after_probation',
+            'carry_over_mode' => 'none',
+        ])->assertCreated()
+            ->assertJsonPath('data.grant_cycle', 'hire_anniversary')
+            ->assertJsonPath('data.tier_timing', 'on_anniversary')
+            ->assertJsonPath('data.hire_grant', 'after_probation')
+            ->assertJsonPath('data.carry_over_mode', 'none');
+    }
+
+    public function test_a_policy_written_before_the_rules_existed_reads_with_their_old_meaning(): void
+    {
+        $this->actingAsWith([Abilities::SETTINGS_MANAGE, Abilities::LEAVE_VIEW]);
+        $type = $this->leaveType();
+        $open = $this->policy($type, ['carry_over_max' => null]);
+        $capped = $this->policy($type, ['carry_over_max' => 5]);
+
+        $this->getJson("/api/hr/leave-policies/{$open->id}")->assertOk()
+            ->assertJsonPath('data.carry_over_mode', 'unlimited')
+            ->assertJsonPath('data.grant_cycle', 'calendar_year')
+            ->assertJsonPath('data.tier_timing', 'next_cycle')
+            ->assertJsonPath('data.hire_grant', 'prorated');
+        $this->getJson("/api/hr/leave-policies/{$capped->id}")->assertOk()->assertJsonPath('data.carry_over_mode', 'capped');
+    }
+
+    public function test_saving_a_policy_credits_the_balances_it_owes_at_once(): void
+    {
+        $this->travelTo('2026-03-02');
+        $this->actingAsWith([Abilities::SETTINGS_MANAGE, Abilities::LEAVE_VIEW]);
+        $type = $this->leaveType();
+        $employee = $this->hireEmployee(['hired_on' => '2024-01-01']);
+
+        $this->postJson('/api/hr/leave-policies', [
+            'leave_type_id' => $type->id, 'effective_from' => '2025-01-01', 'accrual_method' => 'annual_grant', 'annual_entitlement' => 21,
+        ])->assertCreated();
+
+        $this->assertSame(42.0, $this->balanceOf($employee, $type));
+    }
 }

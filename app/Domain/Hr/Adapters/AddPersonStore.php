@@ -120,6 +120,24 @@ class AddPersonStore implements PersonStore
     }
 
     /**
+     * By the account's name in the request's language (its stored name when
+     * it has none in that language); an employee linked to no account by
+     * the name on their row.
+     */
+    public function orderByName(Builder $query, string $direction): void
+    {
+        $column = 'name_'.ColumnPersonStore::locale();
+
+        $query->orderBy(
+            User::query()->withTrashed()
+                ->selectRaw("coalesce({$column}, name)")
+                ->whereColumn('users.id', 'hr_employees.user_id'),
+            $direction,
+        );
+        $this->columns->orderByName($query, $direction);
+    }
+
+    /**
      * Both languages of the account's name; a language the account has no
      * name in shows the stored one, as both did before there were two.
      *

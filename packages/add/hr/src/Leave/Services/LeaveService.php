@@ -48,6 +48,34 @@ class LeaveService
      */
     public function quote(LeaveType $type, array $data, ?Employee $employee = null): float
     {
+        $amount = $this->measure($type, $data, $employee);
+        $this->assertWithinRequestLimits($type, $amount);
+
+        return $amount;
+    }
+
+    /**
+     * The type's own bounds on one request (min_request, max_request), in
+     * its unit. Checked on the quote, so the form says so before sending.
+     */
+    private function assertWithinRequestLimits(LeaveType $type, float $amount): void
+    {
+        $unit = __('hr::leave.unit_'.$type->unit->value);
+
+        if ($type->min_request !== null && $amount < (float) $type->min_request) {
+            HrException::fail('hr::leave.request_too_short', ['amount' => PlainNumber::of($type->min_request), 'unit' => $unit]);
+        }
+
+        if ($type->max_request !== null && $amount > (float) $type->max_request) {
+            HrException::fail('hr::leave.request_too_long', ['amount' => PlainNumber::of($type->max_request), 'unit' => $unit]);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data  starts_on, ends_on, half_day?, hours?
+     */
+    private function measure(LeaveType $type, array $data, ?Employee $employee): float
+    {
         $from = CarbonImmutable::parse($data['starts_on']);
         $to = CarbonImmutable::parse($data['ends_on']);
         $halfDay = isset($data['half_day']) ? HalfDay::from($data['half_day']) : null;

@@ -24,6 +24,21 @@ class StoreLeaveTypeRequest extends FormRequest
             ...TranslatableField::rules('name'),
             'unit' => ['sometimes', Rule::enum(LeaveUnit::class)],
             ...self::flagRules(),
+            ...$this->limitRules(),
+        ];
+    }
+
+    /**
+     * The shortest and longest single request, in the type's unit; empty for
+     * no limit. The longest is never below the shortest.
+     *
+     * @return array<string, mixed>
+     */
+    protected function limitRules(): array
+    {
+        return [
+            'min_request' => ['nullable', 'numeric', 'min:0', 'max:366'],
+            'max_request' => ['nullable', 'numeric', 'gt:0', 'max:366', ...($this->filled('min_request') ? ['gte:min_request'] : [])],
         ];
     }
 

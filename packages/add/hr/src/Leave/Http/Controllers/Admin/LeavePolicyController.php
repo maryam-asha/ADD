@@ -6,11 +6,14 @@ use Add\Hr\Leave\Http\Requests\StoreLeavePolicyRequest;
 use Add\Hr\Leave\Http\Requests\UpdateLeavePolicyRequest;
 use Add\Hr\Leave\Http\Resources\LeavePolicyResource;
 use Add\Hr\Leave\Models\LeavePolicy;
+use Add\Hr\Leave\Services\LeaveAccrual;
+use Add\Hr\Support\LocalDay;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\DB;
 
 class LeavePolicyController extends Controller
 {
@@ -25,9 +28,20 @@ class LeavePolicyController extends Controller
         );
     }
 
-    public function store(StoreLeavePolicyRequest $request): LeavePolicyResource
+    /**
+     * A policy in force today credits what it owes at once, so HR sees the
+     * balances without waiting for the night (LeaveAccrual::forType).
+     */
+    public function store(StoreLeavePolicyRequest $request, LeaveAccrual $accrual): LeavePolicyResource
     {
-        return new LeavePolicyResource(LeavePolicy::query()->create($request->validated())->refresh());
+        $policy = DB::transaction(function () use ($request, $accrual) {
+            $policy = LeavePolicy::query()->create($request->validated())->refresh();
+            $accrual->forType($policy->leaveType, LocalDay::today());
+
+            return $policy;
+        });
+
+        return new LeavePolicyResource($policy);
     }
 
     public function show(LeavePolicy $leavePolicy): LeavePolicyResource
@@ -35,9 +49,18 @@ class LeavePolicyController extends Controller
         return new LeavePolicyResource($leavePolicy);
     }
 
-    public function update(UpdateLeavePolicyRequest $request, LeavePolicy $leavePolicy): JsonResponse
+    /**
+     * Credits whatever the changed policy now owes and was not yet booked
+     * (someone newly in its scope, a cycle it now reaches). A grant already
+     * booked keeps the amount it was booked at: a correction to it is a
+     * balance adjustment.
+     */
+    public function update(UpdateLeavePolicyRequest $request, LeavePolicy $leavePolicy, LeaveAccrual $accrual): JsonResponse
     {
-        $leavePolicy->update($request->validated());
+        DB::transaction(function () use ($request, $leavePolicy, $accrual) {
+            $leavePolicy->update($request->validated());
+            $accrual->forType($leavePolicy->leaveType, LocalDay::today());
+        });
 
         return response()->json(['message' => __('hr::leave.policy_updated')]);
     }

@@ -23,8 +23,13 @@ class LeavePolicyResource extends JsonResource
             'effective_from' => $this->effective_from->toDateString(),
             'effective_to' => $this->effective_to?->toDateString(),
             'accrual_method' => $this->accrual_method->value,
+            'grant_cycle' => $this->grant_cycle->value,
             'annual_entitlement' => $this->annual_entitlement,
             'service_tiers' => $this->service_tiers,
+            'tier_timing' => $this->tier_timing->value,
+            'hire_grant' => $this->hire_grant->value,
+            // Explicit, also for a policy saved before the mode existed.
+            'carry_over_mode' => $this->carryOver()->value,
             'carry_over_max' => $this->carry_over_max,
             'carry_over_expiry_months' => $this->carry_over_expiry_months,
             'max_negative' => $this->max_negative,

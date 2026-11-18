@@ -20,4 +20,9 @@ return [
     'not_cancellable' => 'Only a pending or approved request can be cancelled.',
     'already_started' => 'This leave has already started; ask HR for a balance adjustment instead.',
     'coverage_breached' => 'Approving this leave would leave fewer than :min people at work on :date.',
+    'unit_day' => 'days',
+    'unit_hour' => 'hours',
+    'request_too_short' => 'A request of this type is at least :amount :unit.',
+    'request_too_long' => 'A request of this type is at most :amount :unit.',
+    'anniversary_needs_annual_grant' => 'Only a yearly grant can renew on the hire anniversary.',
 ];

@@ -27,7 +27,7 @@ class CurrentUserController extends Controller
             'user' => new UserResource($request->user()),
             'employee' => $employee === null
                 ? null
-                : new EmployeeSummaryResource($employee->load(['activeAssignment.orgUnit', 'activeAssignment.position'])),
+                : new EmployeeSummaryResource($employee->load(['activeAssignment.orgUnit', 'activeAssignment.position', 'activeAssignment.manager'])),
         ]);
     }
 }

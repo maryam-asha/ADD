@@ -4,6 +4,7 @@ namespace Add\Hr\Leave\Models;
 
 use Add\Hr\Core\Models\DocumentType;
 use Add\Hr\Leave\Enums\LeaveUnit;
+use Add\Hr\Support\Casts\PlainDecimal;
 use Add\Hr\Support\Concerns\HasTranslations;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -26,6 +27,8 @@ class LeaveType extends Model
         'is_paid',
         'tracks_balance',
         'allows_half_day',
+        'min_request',
+        'max_request',
         'counts_calendar_days',
         'hide_reason',
         'attachment_document_type_id',
@@ -38,6 +41,8 @@ class LeaveType extends Model
         'is_paid' => 'boolean',
         'tracks_balance' => 'boolean',
         'allows_half_day' => 'boolean',
+        'min_request' => PlainDecimal::class,
+        'max_request' => PlainDecimal::class,
         'counts_calendar_days' => 'boolean',
         'hide_reason' => 'boolean',
         'is_active' => 'boolean',

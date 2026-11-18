@@ -111,6 +111,67 @@ class EmployeeReadUpdateTest extends TestCase
             ->assertJsonPath('data.dependents.0.date_of_birth', '2020-05-01');
     }
 
+    public function test_the_list_names_each_employees_manager_email_and_employment_type(): void
+    {
+        $manager = $this->hireEmployee(['name' => ['ar' => 'هالة', 'en' => 'Hala Nasr'], 'employee_number' => 'MGR-1']);
+        $this->hireEmployee([
+            'work_email' => 'rami@add.test',
+            'assignment' => ['manager_id' => $manager->id, 'employment_type' => 'part_time'],
+        ]);
+
+        $this->getJson('/api/hr/employees?sort=newest')->assertOk()
+            ->assertJsonPath('data.0.work_email', 'rami@add.test')
+            ->assertJsonPath('data.0.employment_type', 'part_time')
+            ->assertJsonPath('data.0.manager.id', $manager->id)
+            ->assertJsonPath('data.0.manager.employee_number', 'MGR-1')
+            ->assertJsonPath('data.0.manager.name.en', 'Hala Nasr')
+            ->assertJsonPath('data.1.manager', null);
+    }
+
+    public function test_the_list_sorts_by_when_added_or_by_name_in_the_requests_language(): void
+    {
+        $first = $this->hireEmployee(['name' => ['ar' => 'باسل', 'en' => 'Zaid']]);
+        $second = $this->hireEmployee(['name' => ['ar' => 'أحمد', 'en' => 'Yara']]);
+        $third = $this->hireEmployee(['name' => ['ar' => 'تامر', 'en' => 'Adam']]);
+        // The package mounts no locale middleware: the app's locale is the request's.
+        $ids = fn (string $query) => array_column($this->getJson("/api/hr/employees?{$query}")->assertOk()->json('data'), 'id');
+
+        $this->assertSame([$first->id, $second->id, $third->id], $ids(''));
+        $this->assertSame([$first->id, $second->id, $third->id], $ids('sort=oldest'));
+        $this->assertSame([$third->id, $second->id, $first->id], $ids('sort=newest'));
+
+        app()->setLocale('en');
+        $this->assertSame([$third->id, $second->id, $first->id], $ids('sort=name_asc'));
+        $this->assertSame([$first->id, $second->id, $third->id], $ids('sort=name_desc'));
+
+        app()->setLocale('ar');
+        $this->assertSame([$second->id, $first->id, $third->id], $ids('sort=name_asc'));
+
+        $this->getJson('/api/hr/employees?sort=salary')->assertStatus(422);
+    }
+
+    public function test_the_list_downloads_as_an_audited_csv_of_every_match_or_the_chosen_ones(): void
+    {
+        $this->travelToLocal('2026-03-01 12:00');
+        $rami = $this->hireEmployee(['name' => ['ar' => 'رامي', 'en' => 'Rami Halabi'], 'employee_number' => 'E-1', 'work_email' => 'rami@add.test']);
+        $omar = $this->hireEmployee(['name' => ['ar' => 'عمر', 'en' => 'Omar Shami'], 'employee_number' => 'E-2']);
+        app()->setLocale('en');
+
+        $all = $this->get('/api/hr/employees?format=csv')->assertOk();
+        $this->assertStringContainsString('attachment', (string) $all->headers->get('Content-Disposition'));
+        $this->assertStringContainsString('employees-2026-03-01.csv', (string) $all->headers->get('Content-Disposition'));
+        $csv = $all->streamedContent();
+        $this->assertStringStartsWith("\u{FEFF}".'employee_number,employee,status,work_email,job_title,org_unit,manager,employment_type,hired_on', $csv);
+        $this->assertStringContainsString('E-1,"Rami Halabi",active,rami@add.test', $csv);
+        $this->assertStringContainsString('E-2,"Omar Shami"', $csv);
+        $this->assertDatabaseHas('hr_audit_entries', ['action' => 'report_exported']);
+
+        $chosen = $this->get("/api/hr/employees?format=csv&ids[]={$omar->id}")->assertOk()->streamedContent();
+        $this->assertStringContainsString('Omar Shami', $chosen);
+        $this->assertStringNotContainsString('Rami Halabi', $chosen);
+        $this->assertNotNull($rami->id);
+    }
+
     public function test_the_list_shows_units_on_the_organisations_day(): void
     {
         $this->travelToLocal('2026-03-01 12:00');

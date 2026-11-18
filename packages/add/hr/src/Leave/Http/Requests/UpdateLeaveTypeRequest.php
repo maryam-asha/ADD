@@ -20,6 +20,7 @@ class UpdateLeaveTypeRequest extends StoreLeaveTypeRequest
             'code' => ['sometimes', 'string', 'alpha_dash', 'max:32', Rule::unique('hr_leave_types', 'code')->ignore($this->route('leaveType'))],
             ...TranslatableField::sometimes('name'),
             ...self::flagRules(),
+            ...$this->limitRules(),
         ];
     }
 }

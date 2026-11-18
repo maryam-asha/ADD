@@ -58,4 +58,12 @@ interface PersonStore
      * contains $term.
      */
     public function search(Builder $query, string $term): void;
+
+    /**
+     * Order an Employee query by the person's name in the request's
+     * language, wherever the store keeps it.
+     *
+     * @param  'asc'|'desc'  $direction
+     */
+    public function orderByName(Builder $query, string $direction): void;
 }

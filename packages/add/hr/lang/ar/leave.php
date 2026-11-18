@@ -20,4 +20,9 @@ return [
     'not_cancellable' => 'يمكن إلغاء الطلب المعلّق أو الموافق عليه فقط.',
     'already_started' => 'بدأت هذه الإجازة؛ اطلب من الموارد البشرية تعديل الرصيد بدلاً من الإلغاء.',
     'coverage_breached' => 'الموافقة على هذه الإجازة تُبقي أقل من :min في العمل يوم :date.',
+    'unit_day' => 'أيام',
+    'unit_hour' => 'ساعات',
+    'request_too_short' => 'لا يقلّ طلب هذا النوع عن :amount (:unit).',
+    'request_too_long' => 'لا يزيد طلب هذا النوع على :amount (:unit).',
+    'anniversary_needs_annual_grant' => 'التجديد في ذكرى التعيين للمنح السنوي فقط.',
 ];

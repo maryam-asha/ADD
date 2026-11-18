@@ -24,6 +24,7 @@ class UpdateLeavePolicyRequest extends StoreLeavePolicyRequest
             'effective_from' => ['sometimes', 'date'],
             'effective_to' => ['nullable', 'date', 'after_or_equal:'.$from],
             'accrual_method' => ['sometimes', Rule::enum(AccrualMethod::class)],
+            ...$this->ruleChoices(),
             ...self::entitlementRules('sometimes'),
         ];
     }

@@ -129,6 +129,19 @@ class HrPersonOnAccountTest extends TestCase
         $this->assertNull($accounts[$member->id]['employee_id']);
     }
 
+    public function test_the_list_sorts_by_the_account_name_in_the_requests_language(): void
+    {
+        $zaid = $this->hire(User::factory()->create(['name' => 'Zaid', 'name_ar' => 'باسل', 'name_en' => 'Zaid']));
+        $adam = $this->hire(User::factory()->create(['name' => 'Adam', 'name_ar' => 'تامر', 'name_en' => 'Adam']));
+        $yara = $this->hire(User::factory()->create(['name' => 'أحمد', 'name_ar' => null, 'name_en' => null]));
+        $ids = fn (string $locale) => array_values(array_intersect(array_column(
+            $this->getJson('/api/v1/hr/employees?sort=name_asc', ['lang' => $locale])->assertOk()->json('data'), 'id'), [$zaid, $adam, $yara]));
+
+        // An account with no English name sorts by the name it has.
+        $this->assertSame([$adam, $zaid, $yara], $ids('en'));
+        $this->assertSame([$yara, $zaid, $adam], $ids('ar'));
+    }
+
     public function test_workplaces_are_branches_and_currencies_are_adds(): void
     {
         $branch = Branch::factory()->create();

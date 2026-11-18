@@ -31,6 +31,7 @@ use Add\Hr\Integrations\RecordOnlyBenefitFulfiller;
 use Add\Hr\Leave\Console\AccrueLeave;
 use Add\Hr\Leave\Console\CloseLeaveYear;
 use Add\Hr\Leave\Listeners\CancelLeaveAfterTermination;
+use Add\Hr\Leave\Listeners\GrantLeaveOnHire;
 use Add\Hr\Leave\Models\LeaveRequest;
 use Add\Hr\Leave\Services\LeaveApprovalHandler;
 use Add\Hr\Leave\Services\LeaveService;
@@ -107,6 +108,7 @@ class HrServiceProvider extends ServiceProvider
         $this->app->make(Router::class)->aliasMiddleware('hr.employee', EnsureActiveEmployee::class);
 
         Event::listen(EmployeeHired::class, CreateChecklistTasks::class);
+        Event::listen(EmployeeHired::class, GrantLeaveOnHire::class);
         Event::listen(EmployeeTerminated::class, CreateChecklistTasks::class);
         Event::listen(EmployeeTerminated::class, CancelLeaveAfterTermination::class);
         Event::listen(EmployeeTerminated::class, CancelLoansAfterTermination::class);

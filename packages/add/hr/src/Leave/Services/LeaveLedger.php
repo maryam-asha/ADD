@@ -8,18 +8,35 @@ use Add\Hr\Leave\Enums\LedgerKind;
 use Add\Hr\Leave\Models\LeaveRequest;
 use Add\Hr\Leave\Models\LeaveType;
 use Add\Hr\Leave\Models\LedgerEntry;
+use Add\Hr\Leave\Support\LeaveCycle;
 use Add\Hr\Support\LocalDay;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Leave balances as a ledger: every credit and debit is a row, a balance is
- * their sum up to a day. Rows belong to an entitlement year (period_year);
- * usage takes the oldest year with days left first, so carried-over days
- * are spent before they can expire.
+ * their sum up to a day. Rows belong to an entitlement cycle by the year it
+ * starts in (period_year; LeaveCycle); usage takes the oldest cycle with
+ * days left first, so carried-over days are spent before they can expire.
  */
 class LeaveLedger
 {
+    public function __construct(private readonly LeavePolicyResolver $policies) {}
+
+    /**
+     * The entitlement cycle `$on` falls in, by the year it starts in: the
+     * calendar year, or under a hire-anniversary policy the year of the last
+     * anniversary. What a new row belongs to unless it says otherwise.
+     */
+    public function currentPeriodYear(Employee $employee, LeaveType $type, ?CarbonInterface $on = null): int
+    {
+        $day = CarbonImmutable::parse(($on ?? LocalDay::today())->toDateString());
+        $kind = LeaveCycle::kindOf($this->policies->for($employee, $type, $day));
+
+        return LeaveCycle::containing($kind, $employee, $day)->year;
+    }
+
     public function balance(Employee $employee, LeaveType $type, ?CarbonInterface $asOf = null): float
     {
         return round((float) $this->entries($employee, $type, $asOf)->sum('amount'), 2);
@@ -81,8 +98,8 @@ class LeaveLedger
     }
 
     /**
-     * Debits an approved request today, from the oldest year with days left;
-     * whatever they do not cover goes on the current year (a negative
+     * Debits an approved request today, from the oldest cycle with days
+     * left; whatever they do not cover goes on the current cycle (a negative
      * balance, when the policy allows one).
      */
     public function consume(LeaveRequest $request, int|string|null $actorId = null): void
@@ -90,6 +107,7 @@ class LeaveLedger
         $employee = $request->employee;
         $type = $request->leaveType;
         $today = LocalDay::today();
+        $current = $this->currentPeriodYear($employee, $type, $today);
         $left = (float) $request->amount;
 
         foreach ($this->buckets($employee, $type, $today) as $year => $remaining) {
@@ -97,7 +115,7 @@ class LeaveLedger
                 break;
             }
 
-            if ($remaining <= 0 || $year > $today->year) {
+            if ($remaining <= 0 || $year > $current) {
                 continue;
             }
 
@@ -107,7 +125,7 @@ class LeaveLedger
         }
 
         if ($left > 0) {
-            $this->recordUsage($request, -$left, $today->year, $actorId);
+            $this->recordUsage($request, -$left, $current, $actorId);
         }
     }
 
