@@ -277,6 +277,16 @@ class ReminderRunner
             ->whereNotExists(fn ($next) => $next->selectRaw('1')
                 ->from('memberships as next')
                 ->whereColumn('next.renewed_from_id', 'memberships.id'))
+            // Superseded: its holder already took another plan that runs
+            // past it — one bought over it when its hours ran out, say —
+            // so there is nothing about this one to warn them of.
+            ->whereNotExists(fn ($newer) => $newer->selectRaw('1')
+                ->from('memberships as newer')
+                ->whereColumn('newer.owner_type', 'memberships.owner_type')
+                ->whereColumn('newer.owner_id', 'memberships.owner_id')
+                ->whereColumn('newer.id', '!=', 'memberships.id')
+                ->where('newer.status', MembershipStatus::Active->value)
+                ->whereColumn('newer.current_period_end', '>', 'memberships.current_period_end'))
             ->with('plan');
     }
 

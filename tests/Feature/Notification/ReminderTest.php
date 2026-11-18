@@ -131,6 +131,24 @@ class ReminderTest extends RenewalsTestCase
         $this->assertNotNoticed($renewed->owner_id, 'membership.expiring_soon');
     }
 
+    public function test_a_plan_superseded_by_a_newer_one_is_not_reminded(): void
+    {
+        $old = Membership::factory()->create(['current_period_start' => now()->subDays(24), 'current_period_end' => now()->addDays(6), 'auto_renew' => false]);
+        $new = Membership::factory()->create(['owner_type' => $old->owner_type, 'owner_id' => $old->owner_id, 'current_period_start' => now()->subDay(), 'current_period_end' => now()->addDays(29), 'auto_renew' => false]);
+        $other = Membership::factory()->create(['current_period_start' => now()->subDays(24), 'current_period_end' => now()->addDays(6), 'auto_renew' => false]);
+
+        $this->runTwice();
+        $this->travelTo($old->current_period_end->copy()->subHours(12));
+        $this->runTwice();
+        $this->travelTo($old->current_period_end->copy()->addHours(2));
+        $this->runTwice();
+
+        $this->assertNotNoticed($old->owner_id, 'membership.expiring_soon');
+        $this->assertNotNoticed($old->owner_id, 'membership.expired');
+        $this->assertCount(2, $this->notices($other->owner_id, 'membership.expiring_soon'));
+        $this->assertNotNull($new->id);
+    }
+
     public function test_an_ended_plan_is_told_once_unless_long_gone(): void
     {
         $ended = Membership::factory()->create(['current_period_start' => now()->subDays(30), 'current_period_end' => now()->subHours(2)]);
