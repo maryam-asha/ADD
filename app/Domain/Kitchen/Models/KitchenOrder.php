@@ -50,6 +50,8 @@ class KitchenOrder extends Model
         'seat_desk_id',
         'space_id',
         'delivery_note',
+        'member_note',
+        'reception_note',
         'source',
         'status',
         'total_points',

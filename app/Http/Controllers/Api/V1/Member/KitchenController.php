@@ -120,6 +120,7 @@ class KitchenController extends Controller
                     // Only the header: the default branch that ResolveDefaultBranch
                     // puts on every POST would hide the office's branch.
                     $request->hasHeader('X-Branch-Id') ? (int) $request->header('X-Branch-Id') : null,
+                    $request->validated('note'),
                 );
         } catch (KitchenOrderException $e) {
             return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);

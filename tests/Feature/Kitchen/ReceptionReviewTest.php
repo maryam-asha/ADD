@@ -190,6 +190,48 @@ class ReceptionReviewTest extends TestCase
         Notification::assertSentTo($this->member, GeneralNotification::class, fn (GeneralNotification $n) => $n->toArray($this->member)['template_key'] === 'kitchen_order.accepted_by_reception');
     }
 
+    /**
+     * Reception's note goes to the kitchen with the order — where the member
+     * is, or any other detail — and never to the member, beside the
+     * member's own note, which everyone sees.
+     */
+    public function test_reception_note_reaches_the_kitchen_and_never_the_member(): void
+    {
+        $order = $this->waiting(['payment_choice' => OrderPaymentChoice::Wallet, 'paid_at' => now(), 'member_note' => 'No sugar']);
+
+        $this->act($order, 'accept', ['note' => 'Second floor, by the window'])
+            ->assertOk()
+            ->assertJsonPath('data.reception_note', 'Second floor, by the window')
+            ->assertJsonPath('data.note', 'No sugar');
+
+        $this->assertSame('Second floor, by the window', $order->refresh()->reception_note);
+
+        // The kitchen board.
+        $kitchen = User::factory()->create();
+        $kitchen->assignRole(Role::create(['name' => 'cafe', 'guard_name' => 'web'])->givePermissionTo('kitchen-orders.view'));
+        Sanctum::actingAs($kitchen, ['*']);
+        $this->getJson("/api/v1/admin/kitchen/orders/{$order->id}")
+            ->assertOk()
+            ->assertJsonPath('data.reception_note', 'Second floor, by the window');
+
+        // The member: their own note, and no trace of reception's.
+        Sanctum::actingAs($this->member, ['*']);
+        $mine = $this->getJson("/api/v1/member/kitchen-orders/{$order->id}")->assertOk()->assertJsonPath('data.note', 'No sugar');
+        $this->assertArrayNotHasKey('reception_note', $mine->json('data'));
+        $this->assertStringNotContainsString('Second floor', $mine->getContent());
+        $this->assertStringNotContainsString('Second floor', $this->getJson('/api/v1/member/kitchen-orders')->assertOk()->getContent());
+    }
+
+    public function test_the_reception_note_is_optional_and_short(): void
+    {
+        $order = $this->waiting(['payment_choice' => OrderPaymentChoice::Wallet, 'paid_at' => now()]);
+
+        $this->act($order, 'accept', ['note' => str_repeat('a', 501)])->assertStatus(422)->assertJsonValidationErrors('note');
+        $this->assertSame(KitchenOrderStatus::AwaitingReception, $order->refresh()->status);
+
+        $this->act($order, 'accept')->assertOk()->assertJsonPath('data.reception_note', null);
+    }
+
     public function test_accepting_a_cash_order_records_the_cash(): void
     {
         $order = $this->waiting();

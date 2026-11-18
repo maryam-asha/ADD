@@ -24,6 +24,9 @@ class AcceptKitchenOrderRequest extends FormRequest
     {
         return [
             'currency' => ['nullable', 'string', 'exists:currencies,code'],
+            // For the kitchen only — where the member is, or any other
+            // detail; the member never sees it.
+            'note' => ['nullable', 'string', 'max:500'],
         ];
     }
 }

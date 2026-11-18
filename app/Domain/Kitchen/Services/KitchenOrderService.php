@@ -92,10 +92,11 @@ class KitchenOrderService
      * @param  array{type: string, id: int|string}|null  $bill
      * @param  array{method: string, wallet_owner_type?: string|null, wallet_owner_id?: int|null}  $payment
      * @param  ?int  $branchId  the branch the app names (`X-Branch-Id`), read only when nothing else does
+     * @param  ?string  $note  anything the member adds, seen by reception and the kitchen
      *
      * @throws KitchenOrderException a method not offered, no kitchen, a place or a bill refused
      */
-    public function place(User $member, array $lines, ?QrPoint $qr, ?array $delivery, ?array $bill, array $payment, ?int $branchId = null): PlacedOrder
+    public function place(User $member, array $lines, ?QrPoint $qr, ?array $delivery, ?array $bill, array $payment, ?int $branchId = null, ?string $note = null): PlacedOrder
     {
         // A point whose desk or space is gone is no QR at all.
         $place = $qr?->placeModel();
@@ -114,7 +115,7 @@ class KitchenOrderService
         $priced = $this->price($lines, $store);
         $total = array_sum(array_column($priced, 'line_points'));
 
-        return DB::transaction(function () use ($member, $branchId, $store, $billable, $where, $qr, $priced, $total, $decision, $choice, $payment) {
+        return DB::transaction(function () use ($member, $branchId, $store, $billable, $where, $qr, $priced, $total, $decision, $choice, $payment, $note) {
             // The bill first, then the order — the order every closing takes.
             if ($billable !== null) {
                 $locked = $billable::query()->whereKey($billable->getKey())->lockForUpdate()->first();
@@ -131,6 +132,7 @@ class KitchenOrderService
                 'billable_type' => $billable?->getMorphClass(),
                 'billable_id' => $billable?->getKey(),
                 ...$where,
+                'member_note' => $note,
                 'source' => $qr === null ? OrderSource::App : OrderSource::Qr,
                 'route' => $decision->route,
                 'payment_choice' => $choice,

@@ -17,8 +17,8 @@ use Illuminate\Validation\Rule;
  * KitchenOrderService's to say.
  *
  * Sent again with `order_id` — an order of theirs held for its card — only
- * `payment` is read: nothing is created, and `lines`, `qr`, `delivery` and
- * `bill` are ignored (2026-11-14 spec, decision 3).
+ * `payment` is read: nothing is created, and `lines`, `qr`, `delivery`,
+ * `bill` and `note` are ignored (2026-11-14 spec, decision 3).
  */
 class StoreKitchenOrderRequest extends FormRequest
 {
@@ -44,6 +44,8 @@ class StoreKitchenOrderRequest extends FormRequest
             'delivery.type' => ['required_with:delivery', 'string', Rule::in([DeliveryType::Space->value, DeliveryType::Pickup->value, DeliveryType::Note->value])],
             'delivery.space_id' => ['nullable', 'integer', 'exists:spaces,id'],
             'delivery.note' => ['nullable', 'string', 'max:200'],
+            // Anything the member wants to add; reception and the kitchen see it.
+            'note' => ['nullable', 'string', 'max:500'],
             'bill' => ['nullable', 'array'],
             'bill.type' => ['required_with:bill', 'string', Rule::in(['booking', 'walkin'])],
             'bill.id' => ['required_with:bill', 'integer'],

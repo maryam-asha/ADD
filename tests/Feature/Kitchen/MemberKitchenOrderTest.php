@@ -330,6 +330,33 @@ class MemberKitchenOrderTest extends TestCase
         $this->assertSame(0, KitchenOrder::query()->count());
     }
 
+    public function test_the_member_may_add_a_note_to_the_order(): void
+    {
+        $this->walkin();
+
+        $response = $this->send(1, ['delivery' => ['type' => 'pickup'], 'note' => 'No ice, please'])
+            ->assertCreated()
+            ->assertJsonPath('data.note', 'No ice, please');
+
+        $this->assertSame('No ice, please', KitchenOrder::query()->sole()->member_note);
+        // Reception's note for the kitchen is never in the member's order.
+        $this->assertArrayNotHasKey('reception_note', $response->json('data'));
+    }
+
+    public function test_the_note_is_optional_and_short(): void
+    {
+        $this->walkin();
+
+        $this->send(1, ['delivery' => ['type' => 'pickup'], 'note' => str_repeat('a', 501)])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('note');
+        $this->assertSame(0, KitchenOrder::query()->count());
+
+        $this->send(1, ['delivery' => ['type' => 'pickup']])
+            ->assertCreated()
+            ->assertJsonPath('data.note', null);
+    }
+
     public function test_without_a_session_the_order_goes_through_reception(): void
     {
         $this->send(1, ['delivery' => ['type' => 'pickup'], 'payment' => ['method' => 'cash']])

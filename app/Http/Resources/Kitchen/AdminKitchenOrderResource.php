@@ -41,6 +41,10 @@ class AdminKitchenOrderResource extends KitchenOrderResource
                 'wallet_owner_type' => $this->walletOwnerType(),
                 'paid' => $this->paid_at !== null,
             ],
+            // Reception's note for the kitchen, written when it let the order
+            // through. The dashboard's only: KitchenOrderResource, the
+            // member's, never carries it.
+            'reception_note' => $this->reception_note,
             'cash_due_points' => $this->cashDuePoints(),
             // What the desk collects, in each active currency with a rate.
             'cash_due_amounts' => $this->cashDuePoints() === null ? null : app(PointsInCurrencies::class)->for($this->cashDuePoints()),

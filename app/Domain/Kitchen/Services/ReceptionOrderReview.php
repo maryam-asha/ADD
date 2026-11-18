@@ -39,12 +39,15 @@ class ReceptionOrderReview
      * that is already paid (a card payment landed after the member switched
      * to cash) collects nothing and ignores `$currency`.
      *
+     * `$note` goes to the kitchen with the order (where the member is, or
+     * any other detail) and is never shown to the member.
+     *
      * @throws KitchenOrderException not awaiting reception (409)
      * @throws \App\Domain\Finance\Exceptions\PaymentPricingException `$currency` has no rate; nothing is written
      */
-    public function accept(KitchenOrder $order, User $staff, ?string $currency): KitchenOrder
+    public function accept(KitchenOrder $order, User $staff, ?string $currency, ?string $note = null): KitchenOrder
     {
-        DB::transaction(function () use ($order, $staff, $currency) {
+        DB::transaction(function () use ($order, $staff, $currency, $note) {
             $locked = $this->locked($order);
 
             if ($locked->payment_choice === OrderPaymentChoice::Cash && $locked->paid_at === null) {
@@ -67,6 +70,7 @@ class ReceptionOrderReview
                 'reached_kitchen_at' => now(),
                 'reception_decided_by' => $staff->id,
                 'reception_decided_at' => now(),
+                'reception_note' => $note,
             ])->save();
 
             $this->notifier->placed($locked);

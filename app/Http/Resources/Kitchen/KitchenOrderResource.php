@@ -12,7 +12,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * One kitchen order as its member sees it: the `route` it was sent on, how it
  * is paid (`payment.refunded` once its payment was given back, `cash_return`
  * when cash is owed back), `payment_due_at` while a held card order waits,
- * and `bill` null when it has none. `bill.type` uses the coworking
+ * and `bill` null when it has none; `note` is what the member added. Never
+ * reception's note for the kitchen (AdminKitchenOrderResource). `bill.type` uses the coworking
  * names ('booking' | 'walkin'), as `coworking-sessions/{type}/{id}` does.
  *
  * @mixin KitchenOrder
@@ -35,6 +36,8 @@ class KitchenOrderResource extends JsonResource
                 'label' => $this->deliveryLabel(),
                 'note' => $this->delivery_note,
             ],
+            // What the member added when sending it (null: nothing).
+            'note' => $this->member_note,
             'route' => $this->route?->value,
             'bill' => $this->hasBill() ? ['type' => $this->billType(), 'id' => $this->billable_id] : null,
             'payment' => [
